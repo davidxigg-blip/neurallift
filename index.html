@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NeuralLift AI - Checksets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-black text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYW-_yIZ6FJ2GkQIpOy6-Wsma6KMGlHjGW5GEuX-XjOixNpHhGnUosRd_p1xTCBzNw3w/exec";
+
+        function App() {
+            const [view, setView] = useState('dashboard');
+            const [routines, setRoutines] = useState([]);
+            const [logs, setLogs] = useState([]);
+            const [activeSession, setActiveSession] = useState(null);
+
+            useEffect(() => {
+                const r = JSON.parse(localStorage.getItem('nl_routines') || '[]');
+                const l = JSON.parse(localStorage.getItem('nl_logs') || '[]');
+                setRoutines(r);
+                setLogs(l);
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('nl_routines', JSON.stringify(routines));
+                localStorage.setItem('nl_logs', JSON.stringify(logs));
+            }, [routines, logs]);
+
+            const analyzeExercise = (exName) => {
+                try {
+                    const history = logs.filter(l => l.results?.some(r => r.exercise === exName));
+                    if (history.length === 0) return null;
+                    const allSets = history.flatMap(l => l.results.find(r => r.exercise === exName).sets || [])
+                                           .filter(s => s && s.completed && s.weight && s.reps);
+                    if (allSets.length === 0) return null;
+                    
+                    const best = allSets.reduce((p, c) => {
+                        const p1rm = parseFloat(p.weight) * (1 + parseInt(p.reps)/30);
+                        const c1rm = parseFloat(c.weight) * (1 + parseInt(c.reps)/30);
+                        return (c1rm > p1rm) ? c : p;
+                    });
+
+                    const w = parseFloat(best.weight), r = parseInt(best.reps);
+                    if (r >= 10) return { current: `${w}kg x ${r}`, nextW: (w * 1.025).toFixed(1), nextR: 8, msg: "SUBIR PESO", color: "text-green-400" };
+                    if (r >= 8) return { current: `${w}kg x ${r}`, nextW: w, nextR: r + 1, msg: "MÁS REPS", color: "text-blue-400" };
+                    return { current: `${w}kg x ${r}`, nextW: w, nextR: r, msg: "PULIR TÉCNICA", color: "text-yellow-500" };
+                } catch(e) { return null; }
+            };
+
+            const startWorkout = (routine) => {
+                const initialResults = routine.exercises.map(ex => {
+                    const ia = analyzeExercise(ex);
+                    return { exercise: ex, sets: [{ weight: ia?.nextW || '', reps: ia?.nextR || '', completed: false }] };
+                });
+                setActiveSession({ name: routine.name, results: initialResults });
+                setView('workout');
+            };
+
+            const addSet = (exIdx) => {
+                const newResults = [...activeSession.results];
+                const lastSet = newResults[exIdx].sets[newResults[exIdx].sets.length - 1];
+                newResults[exIdx].sets.push({ ...lastSet, completed: false });
+                setActiveSession({ ...activeSession, results: newResults });
+            };
+
+            const toggleSet = (exIdx, setIdx) => {
+                const newResults = [...activeSession.results];
+                newResults[exIdx].sets[setIdx].completed = !newResults[exIdx].sets[setIdx].completed;
+                setActiveSession({ ...activeSession, results: newResults });
+            };
+
+            const finishWorkout = () => {
+                // Filtramos para guardar solo lo que tiene el tick marcado
+                const finalResults = activeSession.results.map(res => ({
+                    exercise: res.exercise,
+                    sets: res.sets.filter(s => s.completed)
+                })).filter(res => res.sets.length > 0);
+
+                if (finalResults.length === 0) {
+                    alert("Marca al menos una serie como completada (tick)");
+                    return;
+                }
+
+                const newLog = { id: Date.now(), routineName: activeSession.name, results: finalResults, timestamp: Date.now() };
+                setLogs([newLog, ...logs]);
+                fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(newLog) });
+                setActiveSession(null);
+                setView('dashboard');
+            };
+
+            return (
+                <div class="min-h-screen flex flex-col bg-black pb-32">
+                    <header class="p-8 pt-12 border-b border-white/5 flex justify-between items-center bg-black/80 backdrop-blur-md sticky top-0 z-50">
+                        <h1 class="text-2xl font-black italic uppercase tracking-tighter text-white">NEURAL<span class="text-blue-600">LIFT</span></h1>
+                        {view === 'dashboard' && <button onClick={() => {
+                            const n = prompt("Nombre:");
+                            const e = prompt("Ejercicios (coma):");
+                            if(n && e) setRoutines([...routines, { id: Date.now(), name: n, exercises: e.split(',').map(x => x.trim()) }]);
+                        }} class="bg-white text-black text-[10px] font-black px-4 py-2 rounded-full uppercase">Nueva Rutina</button>}
+                    </header>
+
+                    <main class="p-6">
+                        {view === 'dashboard' && (
+                            <div class="space-y-6">
+                                {routines.map(r => (
+                                    <div key={r.id} class="bg-zinc-900 p-6 rounded-[2rem] border border-white/5 relative">
+                                        <button onClick={() => {if(confirm("¿Eliminar?")) setRoutines(routines.filter(x => x.id !== r.id))}} class="absolute top-6 right-6 text-gray-700 font-bold">✕</button>
+                                        <h3 class="font-black text-xl uppercase italic mb-1">{r.name}</h3>
+                                        <p class="text-[9px] text-gray-500 uppercase mb-6">{r.exercises.join(' • ')}</p>
+                                        <button onClick={() => startWorkout(r)} class="w-full py-4 bg-blue-600 rounded-2xl font-black text-xs uppercase tracking-widest">Entrenar</button>
+                                    </div>
+                                ))}
+                                {routines.length === 0 && <p class="text-center py-20 text-gray-800 font-black uppercase italic">Sistema sin protocolos</p>}
+                            </div>
+                        )}
+
+                        {view === 'workout' && activeSession && (
+                            <div class="space-y-8 animate-in">
+                                <h2 class="text-2xl font-black italic uppercase text-blue-600">{activeSession.name}</h2>
+                                {activeSession.results.map((ex, exIdx) => (
+                                    <div key={exIdx} class="bg-zinc-900/50 p-6 rounded-[2.5rem] border border-white/5">
+                                        <p class="font-black uppercase text-sm text-blue-500 italic mb-4">{ex.exercise}</p>
+                                        {ex.sets.map((set, setIdx) => (
+                                            <div key={setIdx} class="flex gap-2 mb-3 items-center">
+                                                <input type="number" value={set.weight} onChange={(e) => {
+                                                    const res = [...activeSession.results]; res[exIdx].sets[setIdx].weight = e.target.value; setActiveSession({...activeSession, results: res});
+                                                }} placeholder="KG" class="w-full bg-black border border-white/10 p-3 rounded-xl text-center font-bold text-white text-sm" />
+                                                <input type="number" value={set.reps} onChange={(e) => {
+                                                    const res = [...activeSession.results]; res[exIdx].sets[setIdx].reps = e.target.value; setActiveSession({...activeSession, results: res});
+                                                }} placeholder="REPS" class="w-full bg-black border border-white/10 p-3 rounded-xl text-center font-bold text-white text-sm" />
+                                                
+                                                {/* BOTÓN TICK */}
+                                                <button 
+                                                    onClick={() => toggleSet(exIdx, setIdx)} 
+                                                    class={`w-12 h-10 rounded-xl flex items-center justify-center transition-all ${set.completed ? 'bg-blue-600 shadow-lg shadow-blue-900/40' : 'bg-white/5 border border-white/10'}`}
+                                                >
+                                                    <span class="text-xs">{set.completed ? '✓' : ''}</span>
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button onClick={() => addSet(exIdx)} class="w-full py-2 mt-2 border border-dashed border-white/10 rounded-xl text-[8px] font-black text-gray-500 uppercase">+ Serie</button>
+                                    </div>
+                                ))}
+                                <button onClick={finishWorkout} class="w-full py-6 bg-white text-black rounded-[2rem] font-black uppercase text-sm shadow-xl">Finalizar Sesión</button>
+                            </div>
+                        )}
+
+                        {view === 'analysis' && (
+                            <div class="space-y-6">
+                                <h2 class="text-xs font-black text-gray-500 uppercase tracking-widest mb-8 text-center italic">Neural Insights</h2>
+                                {Array.from(new Set(logs.flatMap(l => l.results.map(r => r.exercise)))).map(exName => {
+                                    const ia = analyzeExercise(exName);
+                                    if (!ia) return null;
+                                    return (
+                                        <div key={exName} class="bg-zinc-900 p-6 rounded-[2rem] border border-white/5">
+                                            <p class="text-blue-600 font-black text-[10px] uppercase mb-4 tracking-tighter">{exName}</p>
+                                            <div class="grid grid-cols-2 gap-4">
+                                                <div class="bg-black/50 p-4 rounded-xl text-center">
+                                                    <p class="text-[6px] text-gray-500 font-black uppercase mb-1">Max Power</p>
+                                                    <p class="text-xs font-black">{ia.current}</p>
+                                                </div>
+                                                <div class="bg-blue-600/5 p-4 rounded-xl border border-blue-600/10 text-center">
+                                                    <p class="text-[6px] text-blue-400 font-black uppercase mb-1">Target</p>
+                                                    <p class="text-xs font-black italic">{ia.nextW}kg x {ia.nextR}</p>
+                                                </div>
+                                            </div>
+                                            <p class={`mt-4 text-[8px] font-black text-center tracking-widest uppercase ${ia.color}`}>{ia.msg}</p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {view === 'history' && (
+                            <div class="space-y-4 text-white">
+                                <h2 class="text-xs font-black text-gray-500 uppercase tracking-widest mb-8 text-center italic">Archivo de Sesiones</h2>
+                                {logs.map(l => (
+                                    <div key={l.id} class="bg-zinc-900/30 p-6 rounded-[2rem] border border-white/5 relative">
+                                        <button onClick={() => {if(confirm("¿Borrar?")) setLogs(logs.filter(x => x.id !== l.id))}} class="absolute top-6 right-6 text-red-900/50 text-[10px] font-black">BORRAR</button>
+                                        <p class="text-blue-500 font-black text-[10px] uppercase italic mb-4">{l.routineName} <span class="text-gray-600 font-normal ml-2">{new Date(l.timestamp).toLocaleDateString()}</span></p>
+                                        {l.results.map((res, idx) => (
+                                            <div key={idx} class="border-t border-white/5 py-3">
+                                                <p class="text-[8px] font-black text-gray-500 uppercase mb-1">{res.exercise}</p>
+                                                <div class="flex flex-wrap gap-1">
+                                                    {(res.sets || []).map((s, si) => (
+                                                        <span key={si} class="text-[9px] font-bold text-white bg-white/5 px-2 py-1 rounded-md">{s.weight}x{s.reps}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </main>
+
+                    <nav class="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/5 p-8 flex justify-around items-center z-50">
+                        <button onClick={() => setView('dashboard')} class={`text-[9px] font-black uppercase tracking-widest ${view === 'dashboard' ? 'text-blue-500' : 'text-gray-600'}`}>Protocolos</button>
+                        <button onClick={() => setView('analysis')} class={`text-[9px] font-black uppercase tracking-widest ${view === 'analysis' ? 'text-blue-500' : 'text-gray-600'}`}>Análisis</button>
+                        <button onClick={() => setView('history')} class={`text-[9px] font-black uppercase tracking-widest ${view === 'history' ? 'text-blue-500' : 'text-gray-600'}`}>Archivo</button>
+                    </nav>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
