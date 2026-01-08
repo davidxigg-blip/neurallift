@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>NeuralLift AI - Cloud</title>
+    <title>NeuralLift AI - Secure Cloud</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,7 +13,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // Tus credenciales reales de la captura
         const firebaseConfig = {
             apiKey: "AIzaSyDlEh7wcEQaAuXZbBmPHqqgdE2nplXOyPg",
             authDomain: "neurallift-ai.firebaseapp.com",
@@ -25,8 +24,6 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        
-        // Exponemos las funciones necesarias globalmente para React
         window.fb = { db, collection, addDoc, onSnapshot, query, orderBy };
     </script>
 
@@ -40,6 +37,7 @@
 
     <script type="text/babel">
         const { useState, useEffect } = React;
+        const SECRET_KEY = "971101"; // Tu clave secreta
 
         function App() {
             const [view, setView] = useState('dashboard');
@@ -47,27 +45,35 @@
             const [logs, setLogs] = useState([]);
             const [activeSession, setActiveSession] = useState(null);
 
-            // Sincronización en tiempo real
             useEffect(() => {
                 if (!window.fb) return;
                 const { db, collection, onSnapshot, query, orderBy } = window.fb;
 
-                // Cargar rutinas de LocalStorage (o podrías subirlas a Firebase también)
-                setRoutines(JSON.parse(localStorage.getItem('nl_routines') || '[]'));
-
-                // Escuchar cambios en el historial de Firebase
-                const q = query(collection(db, "logs"), orderBy("timestamp", "desc"));
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setLogs(logsData);
+                const unsubRoutines = onSnapshot(collection(db, "routines"), (snap) => {
+                    setRoutines(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
 
-                return () => unsubscribe();
+                const q = query(collection(db, "logs"), orderBy("timestamp", "desc"));
+                const unsubLogs = onSnapshot(q, (snap) => {
+                    setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                });
+
+                return () => { unsubRoutines(); unsubLogs(); };
             }, []);
 
-            useEffect(() => {
-                localStorage.setItem('nl_routines', JSON.stringify(routines));
-            }, [routines]);
+            const addRoutine = async () => {
+                const n = prompt("Nombre de la rutina:");
+                const e = prompt("Ejercicios (separados por comas):");
+                if (n && e) {
+                    try {
+                        await window.fb.addDoc(window.fb.collection(window.fb.db, "routines"), {
+                            name: n,
+                            exercises: e.split(',').map(x => x.trim()),
+                            adminKey: SECRET_KEY // Clave para validar en Firebase
+                        });
+                    } catch (err) { alert("Error: Verifica las reglas de Firebase"); }
+                }
+            };
 
             const finishWorkout = async () => {
                 const finalResults = activeSession.results.map(res => ({
@@ -75,97 +81,97 @@
                     sets: res.sets.filter(s => s.completed)
                 })).filter(res => res.sets.length > 0);
 
-                if (finalResults.length === 0) return alert("Marca alguna serie con el tick");
-
-                const newLog = {
-                    routineName: activeSession.name,
-                    results: finalResults,
-                    timestamp: Date.now()
-                };
+                if (finalResults.length === 0) return alert("Marca alguna serie");
 
                 try {
-                    await window.fb.addDoc(window.fb.collection(window.fb.db, "logs"), newLog);
+                    await window.fb.addDoc(window.fb.collection(window.fb.db, "logs"), {
+                        routineName: activeSession.name,
+                        results: finalResults,
+                        timestamp: Date.now(),
+                        adminKey: SECRET_KEY // Clave para validar en Firebase
+                    });
                     setActiveSession(null);
                     setView('dashboard');
                 } catch (e) {
-                    alert("Error al guardar en la nube: " + e.message);
+                    alert("Error de seguridad: Clave incorrecta o reglas expiradas");
                 }
             };
 
-            // ... (Resto de la lógica de UI de las versiones anteriores) ...
-            
             return (
-                <div className="min-h-screen bg-black p-6 pb-24">
+                <div className="min-h-screen bg-black p-6 pb-32">
                     <header className="flex justify-between items-center mb-8 pt-4">
-                        <h1 className="text-xl font-black italic tracking-tighter text-white">NEURAL<span className="text-blue-600">LIFT</span></h1>
-                        <span className="text-[8px] bg-blue-600/20 text-blue-400 px-2 py-1 rounded-full font-bold">CLOUD SYNC</span>
+                        <h1 className="text-xl font-black italic tracking-tighter">NEURAL<span className="text-blue-600">LIFT</span></h1>
+                        <div className="flex gap-4">
+                            <button onClick={() => setView('dashboard')} className={`text-[10px] font-bold uppercase ${view === 'dashboard' ? 'text-blue-500' : 'text-gray-500'}`}>Rutinas</button>
+                            <button onClick={() => setView('history')} className={`text-[10px] font-bold uppercase ${view === 'history' ? 'text-blue-500' : 'text-gray-500'}`}>Historial</button>
+                        </div>
                     </header>
 
-                    {/* Botón para crear rutinas */}
-                    {view === 'dashboard' && (
-                        <button onClick={() => {
-                            const n = prompt("Nombre:");
-                            const e = prompt("Ejercicios (coma):");
-                            if(n && e) setRoutines([...routines, { id: Date.now(), name: n, exercises: e.split(',').map(x => x.trim()) }]);
-                        }} className="w-full py-4 border-2 border-dashed border-white/10 rounded-2xl text-[10px] font-black uppercase text-gray-500 mb-8">
-                            + Crear Protocolo de Entrenamiento
-                        </button>
-                    )}
-
                     <main>
-                        {view === 'dashboard' && routines.map(r => (
-                            <div key={r.id} className="bg-zinc-900 p-6 rounded-[2rem] border border-white/5 mb-4">
-                                <h3 className="font-black text-lg uppercase italic">{r.name}</h3>
-                                <button onClick={() => {
-                                    const init = r.exercises.map(ex => ({ exercise: ex, sets: [{weight:'', reps:'', completed:false}] }));
-                                    setActiveSession({name: r.name, results: init});
-                                    setView('workout');
-                                }} className="w-full mt-4 py-3 bg-blue-600 rounded-xl font-black text-[10px] uppercase">Entrenar</button>
+                        {view === 'dashboard' && (
+                            <div className="space-y-4">
+                                <button onClick={addRoutine} className="w-full py-4 border border-dashed border-white/10 rounded-2xl text-[10px] font-bold text-gray-600 uppercase italic">+ Crear Nuevo Protocolo</button>
+                                {routines.map(r => (
+                                    <div key={r.id} className="bg-zinc-900 p-6 rounded-[2.5rem] border border-white/5">
+                                        <h3 className="font-black text-lg uppercase italic mb-1">{r.name}</h3>
+                                        <p className="text-[9px] text-gray-500 mb-4 tracking-widest">{r.exercises.join(' • ')}</p>
+                                        <button onClick={() => {
+                                            const init = r.exercises.map(ex => ({ exercise: ex, sets: [{weight:'', reps:'', completed:false}] }));
+                                            setActiveSession({name: r.name, results: init});
+                                            setView('workout');
+                                        }} className="w-full py-4 bg-blue-600 rounded-2xl font-black text-[10px] uppercase tracking-tighter">Iniciar Entrenamiento</button>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        )}
 
                         {view === 'workout' && activeSession && (
                             <div className="space-y-6">
+                                <h2 className="text-xl font-black text-blue-600 uppercase italic">{activeSession.name}</h2>
                                 {activeSession.results.map((ex, exIdx) => (
-                                    <div key={exIdx} className="bg-zinc-900/50 p-5 rounded-[2rem] border border-white/5">
-                                        <p className="font-black text-[10px] uppercase text-blue-500 mb-4">{ex.exercise}</p>
+                                    <div key={exIdx} className="bg-zinc-900/50 p-6 rounded-[2rem] border border-white/5">
+                                        <p className="font-black text-xs uppercase mb-4 text-gray-400">{ex.exercise}</p>
                                         {ex.sets.map((set, setIdx) => (
                                             <div key={setIdx} className="flex gap-2 mb-2">
                                                 <input type="number" placeholder="KG" value={set.weight} onChange={e => {
                                                     const res = [...activeSession.results]; res[exIdx].sets[setIdx].weight = e.target.value; setActiveSession({...activeSession, results: res});
-                                                }} className="w-full bg-black border border-white/10 p-3 rounded-xl text-center font-bold text-sm" />
+                                                }} className="w-full bg-black border border-white/10 p-4 rounded-xl text-center font-bold" />
                                                 <input type="number" placeholder="REPS" value={set.reps} onChange={e => {
                                                     const res = [...activeSession.results]; res[exIdx].sets[setIdx].reps = e.target.value; setActiveSession({...activeSession, results: res});
-                                                }} className="w-full bg-black border border-white/10 p-3 rounded-xl text-center font-bold text-sm" />
+                                                }} className="w-full bg-black border border-white/10 p-4 rounded-xl text-center font-bold" />
                                                 <button onClick={() => {
                                                     const res = [...activeSession.results]; res[exIdx].sets[setIdx].completed = !res[exIdx].sets[setIdx].completed; setActiveSession({...activeSession, results: res});
-                                                }} className={`w-14 rounded-xl font-bold ${set.completed ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-700'}`}>✓</button>
+                                                }} className={`w-16 rounded-xl transition-all ${set.completed ? 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'bg-white/5 opacity-30'}`}>✓</button>
                                             </div>
                                         ))}
                                         <button onClick={() => {
                                             const res = [...activeSession.results]; res[exIdx].sets.push({weight:'', reps:'', completed:false}); setActiveSession({...activeSession, results: res});
-                                        }} className="w-full py-2 text-[8px] font-black text-gray-600 uppercase">+ Serie</button>
+                                        }} className="w-full py-2 mt-2 text-[9px] font-bold text-gray-700 uppercase tracking-widest">+ Añadir Serie</button>
                                     </div>
                                 ))}
-                                <button onClick={finishWorkout} className="w-full py-5 bg-white text-black rounded-[2rem] font-black uppercase text-xs">Finalizar y Sincronizar</button>
+                                <button onClick={finishWorkout} className="w-full py-6 bg-white text-black rounded-[2.5rem] font-black uppercase text-sm shadow-xl">Finalizar y Sincronizar</button>
                             </div>
                         )}
-                        
-                        {view === 'history' && logs.map(l => (
-                            <div key={l.id} className="bg-zinc-900/40 p-5 rounded-2xl border border-white/5 mb-3">
-                                <p className="text-[10px] font-black text-blue-500 uppercase">{l.routineName}</p>
-                                <p className="text-[8px] text-gray-600 mb-2">{new Date(l.timestamp).toLocaleString()}</p>
-                                {l.results.map((res, i) => (
-                                    <p key={i} className="text-[9px] text-gray-400">{res.exercise}: {res.sets.length} series</p>
+
+                        {view === 'history' && (
+                            <div className="space-y-4">
+                                {logs.map(l => (
+                                    <div key={l.id} className="bg-zinc-900/30 p-5 rounded-2xl border border-white/5">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <p className="text-[10px] font-black text-blue-500 uppercase italic">{l.routineName}</p>
+                                            <p className="text-[8px] text-gray-600">{new Date(l.timestamp).toLocaleDateString()}</p>
+                                        </div>
+                                        {l.results.map((res, i) => (
+                                            <div key={i} className="flex justify-between border-t border-white/5 py-1">
+                                                <span className="text-[10px] text-gray-400">{res.exercise}</span>
+                                                <span className="text-[10px] font-bold">{res.sets.length}s</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 ))}
                             </div>
-                        ))}
+                        )}
                     </main>
-
-                    <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-md p-6 flex justify-around border-t border-white/5">
-                        <button onClick={() => setView('dashboard')} className={`text-[9px] font-black uppercase ${view === 'dashboard' ? 'text-blue-500' : 'text-gray-500'}`}>Entrenar</button>
-                        <button onClick={() => setView('history')} className={`text-[9px] font-black uppercase ${view === 'history' ? 'text-blue-500' : 'text-gray-500'}`}>Historial</button>
-                    </nav>
                 </div>
             );
         }
