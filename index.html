@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>NeuralLift AI v2.0</title>
+    <title>NeuralLift AI v2.1</title>
     
     <!-- LIBRARIES -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,7 +19,6 @@
         /* Utility Classes */
         .glass { background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--border); }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
         /* Input Resets */
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -33,10 +32,12 @@
 <body>
     <div id="root"></div>
 
-    <!-- FIREBASE INIT -->
+    <!-- FIREBASE INIT WITH AUTH -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        // ADDED: Authentication Import
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDlEh7wcEQaAuXZbBmPHqqgdE2nplXOyPg",
@@ -50,22 +51,25 @@
         try {
             const app = initializeApp(firebaseConfig);
             const db = getFirestore(app);
-            // Attach to window for React to access securely
+            const auth = getAuth(app); // Initialize Auth
+
+            // Expose to window for React
             window.db = db;
+            window.auth = auth;
+            window.signInAnonymously = signInAnonymously;
             window.fb = { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, arrayUnion };
             window.isFirebaseLoaded = true;
             console.log("System Online");
         } catch (e) {
             console.error("Firebase Error", e);
-            document.body.innerHTML = `<div style="padding:20px; color:red">Error de conexión: ${e.message}</div>`;
+            document.body.innerHTML = `<div style="padding:20px; color:red">Error de configuración: ${e.message}</div>`;
         }
     </script>
 
     <!-- REACT APP -->
     <script type="text/babel">
-        const { useState, useEffect, useCallback } = React;
+        const { useState, useEffect } = React;
 
-        // --- CONSTANTS ---
         const EXERCISES_DB = {
             "Empuje (Push)": ["Press Banca", "Press Inclinado", "Press Militar", "Aperturas", "Fondos", "Extensiones Tríceps", "Elevaciones Laterales"],
             "Tracción (Pull)": ["Dominadas", "Jalón al Pecho", "Remo Barra", "Remo Gironda", "Peso Muerto", "Curl Bíceps", "Facepull"],
@@ -73,10 +77,7 @@
             "Core/Otros": ["Plancha Abdominal", "Crunch", "Rueda Abdominal", "Burpees", "Cardio HIIT"]
         };
 
-        // --- COMPONENTS ---
-
-        // 1. LOGIN SCREEN
-        const Login = ({ onLogin }) => {
+        const Login = ({ onLogin, loading }) => {
             const handleSubmit = (e) => {
                 e.preventDefault();
                 const pin = e.target.pin.value.trim();
@@ -87,32 +88,32 @@
                 <div className="h-screen flex flex-col items-center justify-center p-6 animate-enter">
                     <div className="mb-8 text-center">
                         <h1 className="text-3xl font-black italic tracking-tighter uppercase mb-2">Neural<span className="text-blue-500">Lift</span></h1>
-                        <p className="text-xs text-zinc-500 font-mono tracking-widest">SYSTEM V2.0</p>
+                        <p className="text-xs text-zinc-500 font-mono tracking-widest">SECURE VAULT</p>
                     </div>
                     <form onSubmit={handleSubmit} className="w-full max-w-xs space-y-4">
                         <input name="pin" type="tel" placeholder="ACCESS PIN" className="w-full bg-zinc-900 border border-white/10 rounded-2xl p-5 text-center text-xl text-white font-bold transition-all focus:border-blue-500" />
-                        <button className="w-full bg-white text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-transform">Desbloquear</button>
+                        <button disabled={loading} className={`w-full bg-white text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-transform ${loading ? 'opacity-50' : ''}`}>
+                            {loading ? 'CONECTANDO...' : 'DESBLOQUEAR'}
+                        </button>
                     </form>
                 </div>
             );
         };
 
-        // 2. MAIN APP
         const App = () => {
             const [user, setUser] = useState(localStorage.getItem("vault_token"));
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [ready, setReady] = useState(false);
-            const [view, setView] = useState('routines'); // routines, workout, history
+            const [view, setView] = useState('routines');
             
-            // Data States
             const [routines, setRoutines] = useState([]);
             const [logs, setLogs] = useState([]);
             
-            // Operational States
-            const [activeRoutine, setActiveRoutine] = useState(null); // The workout currently being done
-            const [isCreating, setIsCreating] = useState(false); // Modal for creating routine
-            const [selectorId, setSelectorId] = useState(null); // Routine ID for adding exercises
+            const [activeRoutine, setActiveRoutine] = useState(null);
+            const [isCreating, setIsCreating] = useState(false);
+            const [selectorId, setSelectorId] = useState(null);
 
-            // --- INITIALIZATION ---
+            // 1. Wait for Firebase Scripts
             useEffect(() => {
                 const check = setInterval(() => {
                     if (window.isFirebaseLoaded) {
@@ -123,23 +124,40 @@
                 return () => clearInterval(check);
             }, []);
 
-            // --- DATA SYNC ---
+            // 2. Perform Authentication and Data Sync
             useEffect(() => {
                 if (!user || !ready) return;
-                const { collection, onSnapshot, query, orderBy } = window.fb;
-                
-                // Sync Routines
-                const unsubR = onSnapshot(collection(window.db, `${user}_routines`), 
-                    (s) => setRoutines(s.docs.map(d => ({id: d.id, ...d.data()}))));
-                
-                // Sync History
-                const unsubL = onSnapshot(query(collection(window.db, `${user}_logs`), orderBy("timestamp", "desc")), 
-                    (s) => setLogs(s.docs.map(d => ({id: d.id, ...d.data()}))));
 
-                return () => { unsubR(); unsubL(); };
+                // Auto-Login Anonymously to fix Permissions Error
+                const authAndSync = async () => {
+                    try {
+                        // Sign in first
+                        await window.signInAnonymously(window.auth);
+                        setIsAuthenticated(true);
+
+                        // Then sync data
+                        const { collection, onSnapshot, query, orderBy } = window.fb;
+                        
+                        const unsubR = onSnapshot(collection(window.db, `${user}_routines`), 
+                            (s) => setRoutines(s.docs.map(d => ({id: d.id, ...d.data()}))),
+                            (error) => console.error("Routines Permission Error:", error)
+                        );
+                        
+                        const unsubL = onSnapshot(query(collection(window.db, `${user}_logs`), orderBy("timestamp", "desc")), 
+                            (s) => setLogs(s.docs.map(d => ({id: d.id, ...d.data()}))),
+                            (error) => console.error("Logs Permission Error:", error)
+                        );
+
+                        return () => { unsubR(); unsubL(); };
+
+                    } catch (err) {
+                        console.error("Authentication Failed:", err);
+                        alert("Error de autenticación: Verifica la consola y las reglas de Firebase.");
+                    }
+                };
+
+                authAndSync();
             }, [user, ready]);
-
-            // --- ACTIONS ---
 
             const handleLogin = (pin) => {
                 localStorage.setItem("vault_token", pin);
@@ -153,7 +171,7 @@
                         name: name.toUpperCase(), exercises: [], createdAt: Date.now()
                     });
                     setIsCreating(false);
-                } catch (e) { alert("Error: " + e.message); }
+                } catch (e) { alert("Error (Permisos): " + e.message); }
             };
 
             const addExercise = async (exercise) => {
@@ -167,17 +185,16 @@
             };
 
             const deleteRoutine = async (id) => {
-                if (confirm("¿Eliminar este protocolo permanentemente?")) {
+                if (confirm("¿Borrar rutina?")) {
                     await window.fb.deleteDoc(window.fb.doc(window.db, `${user}_routines`, id));
                 }
             };
 
             const startWorkout = (routine) => {
                 if (!routine.exercises || routine.exercises.length === 0) {
-                    alert("Añade ejercicios antes de empezar.");
+                    alert("Añade ejercicios primero.");
                     return;
                 }
-                // Prepare the tracking object
                 setActiveRoutine({
                     name: routine.name,
                     startTime: Date.now(),
@@ -190,30 +207,30 @@
             };
 
             const finishWorkout = async () => {
-                // Filter empty data
                 const validResults = activeRoutine.results.map(r => ({
                     exercise: r.exercise,
                     sets: r.sets.filter(s => s.completed && (s.weight || s.reps))
                 })).filter(r => r.sets.length > 0);
 
                 if (validResults.length === 0) {
-                    alert("No has completado ninguna serie.");
+                    alert("Completa al menos una serie.");
                     return;
                 }
 
-                await window.fb.addDoc(window.fb.collection(window.db, `${user}_logs`), {
-                    routineName: activeRoutine.name,
-                    timestamp: Date.now(),
-                    duration: Math.floor((Date.now() - activeRoutine.startTime) / 60000),
-                    results: validResults
-                });
-
-                setActiveRoutine(null);
-                setView('history');
+                try {
+                    await window.fb.addDoc(window.fb.collection(window.db, `${user}_logs`), {
+                        routineName: activeRoutine.name,
+                        timestamp: Date.now(),
+                        duration: Math.floor((Date.now() - activeRoutine.startTime) / 60000),
+                        results: validResults
+                    });
+                    setActiveRoutine(null);
+                    setView('history');
+                } catch (e) {
+                    alert("Error guardando: " + e.message);
+                }
             };
 
-            // --- WORKOUT STATE HANDLERS ---
-            // Using functional updates to ensure we never mutate state directly
             const updateSet = (exIdx, setIdx, field, value) => {
                 setActiveRoutine(prev => {
                     const next = structuredClone(prev);
@@ -238,114 +255,88 @@
                 });
             };
 
-            // --- RENDER HELPERS ---
+            if (!ready) return <div className="h-screen bg-black flex items-center justify-center text-zinc-600 font-mono text-xs">LOADING SYSTEM...</div>;
             
-            if (!ready) return <div className="h-screen bg-black flex items-center justify-center text-zinc-600 font-mono text-xs">INITIALIZING...</div>;
-            if (!user) return <Login onLogin={handleLogin} />;
+            // Wait for user PIN and then wait for Anonymous Auth to complete
+            if (!user) return <Login onLogin={handleLogin} loading={false} />;
+            if (!isAuthenticated) return <div className="h-screen bg-black flex flex-col items-center justify-center animate-enter"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div><span className="text-zinc-500 text-xs font-black uppercase">Autenticando...</span></div>;
 
             return (
                 <div className="min-h-screen pb-24 relative">
-                    
-                    {/* TOP HEADER */}
                     <header className="px-6 py-6 flex justify-between items-center sticky top-0 z-30 bg-black/80 backdrop-blur-md">
                         <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
                             <span className="font-black italic uppercase tracking-tighter text-lg">Neural<span className="text-blue-500">Lift</span></span>
                         </div>
                         <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="text-[10px] font-bold text-zinc-600 uppercase">Salir</button>
                     </header>
 
-                    {/* VIEW: ROUTINES */}
+                    {/* ROUTINES VIEW */}
                     {view === 'routines' && !activeRoutine && (
                         <div className="px-5 space-y-4 animate-enter">
-                            {/* Create Button */}
-                            <button onClick={() => setIsCreating(true)} className="w-full py-5 rounded-3xl border border-dashed border-zinc-800 text-zinc-500 font-black text-[10px] uppercase italic hover:bg-zinc-900 transition-colors">
-                                + Crear Protocolo
-                            </button>
-
-                            {/* List */}
+                            <button onClick={() => setIsCreating(true)} className="w-full py-5 rounded-3xl border border-dashed border-zinc-800 text-zinc-500 font-black text-[10px] uppercase italic hover:bg-zinc-900 transition-colors">+ Crear Protocolo</button>
                             {routines.map(r => (
                                 <div key={r.id} className="glass p-6 rounded-3xl relative">
                                     <div className="flex justify-between items-start mb-4">
                                         <h3 className="text-xl font-black uppercase italic text-white">{r.name}</h3>
                                         <button onClick={() => deleteRoutine(r.id)} className="p-2 text-zinc-600 hover:text-red-500 transition-colors">✕</button>
                                     </div>
-                                    
                                     <div className="flex flex-wrap gap-2 mb-6">
                                         {(r.exercises || []).map((ex, i) => (
                                             <span key={i} className="text-[9px] font-bold uppercase bg-black border border-white/5 text-zinc-400 px-2.5 py-1.5 rounded-lg">{ex}</span>
                                         ))}
                                         <button onClick={() => setSelectorId(r.id)} className="text-[10px] font-black bg-blue-500/10 text-blue-500 px-3 py-1.5 rounded-lg hover:bg-blue-500 hover:text-white transition-colors">+ Ejercicio</button>
                                     </div>
-
-                                    <button onClick={() => startWorkout(r)} className="w-full py-4 bg-white text-black font-black text-[10px] uppercase tracking-widest rounded-2xl active:scale-95 transition-transform">
-                                        Comenzar Entrenamiento
-                                    </button>
+                                    <button onClick={() => startWorkout(r)} className="w-full py-4 bg-white text-black font-black text-[10px] uppercase tracking-widest rounded-2xl active:scale-95 transition-transform">Comenzar Entrenamiento</button>
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {/* VIEW: ACTIVE WORKOUT */}
+                    {/* WORKOUT VIEW */}
                     {view === 'workout' && activeRoutine && (
                         <div className="px-5 space-y-6 animate-enter">
                             <div className="flex justify-between items-end border-b border-white/10 pb-4">
-                                <h2 className="text-2xl font-black italic uppercase text-blue-500 break-words w-2/3">{activeRoutine.name}</h2>
-                                <button onClick={() => { if(confirm("¿Cancelar entrenamiento?")) { setActiveRoutine(null); setView('routines'); } }} className="text-zinc-500 text-[10px] font-bold uppercase underline">Cancelar</button>
+                                <h2 className="text-2xl font-black italic uppercase text-blue-500 truncate pr-4">{activeRoutine.name}</h2>
+                                <button onClick={() => { if(confirm("¿Cancelar?")) { setActiveRoutine(null); setView('routines'); } }} className="text-zinc-500 text-[10px] font-bold uppercase underline">Cancelar</button>
                             </div>
-
                             {activeRoutine.results.map((ex, exIdx) => (
                                 <div key={exIdx} className="glass p-5 rounded-3xl">
                                     <h4 className="text-[11px] font-black uppercase text-zinc-400 mb-4 tracking-widest">{ex.exercise}</h4>
-                                    
                                     <div className="space-y-2">
                                         {ex.sets.map((set, setIdx) => (
                                             <div key={setIdx} className={`flex gap-2 items-center ${set.completed ? 'opacity-40' : 'opacity-100'} transition-opacity`}>
                                                 <div className="grid grid-cols-2 gap-2 flex-1">
-                                                    <input type="number" inputMode="decimal" placeholder="KG" value={set.weight} 
-                                                        onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)}
-                                                        className="bg-black border border-white/10 rounded-xl p-3 text-center text-white font-bold text-lg focus:border-blue-500" />
-                                                    <input type="number" inputMode="decimal" placeholder="REPS" value={set.reps} 
-                                                        onChange={(e) => updateSet(exIdx, setIdx, 'reps', e.target.value)}
-                                                        className="bg-black border border-white/10 rounded-xl p-3 text-center text-white font-bold text-lg focus:border-blue-500" />
+                                                    <input type="number" inputMode="decimal" placeholder="KG" value={set.weight} onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)} className="bg-black border border-white/10 rounded-xl p-3 text-center text-white font-bold text-lg focus:border-blue-500" />
+                                                    <input type="number" inputMode="decimal" placeholder="REPS" value={set.reps} onChange={(e) => updateSet(exIdx, setIdx, 'reps', e.target.value)} className="bg-black border border-white/10 rounded-xl p-3 text-center text-white font-bold text-lg focus:border-blue-500" />
                                                 </div>
-                                                <button onClick={() => toggleSet(exIdx, setIdx)} className={`h-full aspect-square rounded-xl flex items-center justify-center font-bold text-lg transition-colors ${set.completed ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-600'}`}>
-                                                    ✓
-                                                </button>
+                                                <button onClick={() => toggleSet(exIdx, setIdx)} className={`h-full aspect-square rounded-xl flex items-center justify-center font-bold text-lg transition-colors ${set.completed ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-600'}`}>✓</button>
                                             </div>
                                         ))}
                                     </div>
                                     <button onClick={() => addSet(exIdx)} className="mt-3 w-full py-2 border border-dashed border-zinc-800 rounded-xl text-[9px] font-black uppercase text-zinc-600 hover:bg-zinc-900">+ Serie</button>
                                 </div>
                             ))}
-
-                            <button onClick={finishWorkout} className="w-full py-5 bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-3xl shadow-lg shadow-blue-900/40 mb-10 active:scale-95 transition-transform">
-                                Finalizar Entrenamiento
-                            </button>
+                            <button onClick={finishWorkout} className="w-full py-5 bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-3xl shadow-lg shadow-blue-900/40 mb-10">Finalizar</button>
                         </div>
                     )}
 
-                    {/* VIEW: HISTORY */}
+                    {/* HISTORY VIEW */}
                     {view === 'history' && (
                         <div className="px-5 space-y-4 animate-enter">
-                            {logs.length === 0 && <div className="text-center text-zinc-600 text-xs font-bold mt-10 uppercase">No hay registros recientes</div>}
-                            
+                            {logs.length === 0 && <div className="text-center text-zinc-600 text-xs font-bold mt-10 uppercase">Sin historial</div>}
                             {logs.map(log => (
                                 <div key={log.id} className="glass p-6 rounded-3xl border-l-4 border-l-blue-600">
                                     <div className="flex justify-between items-baseline mb-4">
                                         <h3 className="text-sm font-black uppercase italic text-white">{log.routineName}</h3>
-                                        <span className="text-[9px] font-bold text-zinc-500 uppercase">{new Date(log.timestamp).toLocaleDateString()} • {log.duration || 0} MIN</span>
+                                        <span className="text-[9px] font-bold text-zinc-500 uppercase">{new Date(log.timestamp).toLocaleDateString()}</span>
                                     </div>
                                     <div className="space-y-3">
                                         {log.results.map((res, i) => (
-                                            <div key={i} className="flex justify-between items-start text-[10px] border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                                            <div key={i} className="flex justify-between items-start text-[10px] border-b border-white/5 pb-2 last:border-0">
                                                 <span className="font-bold text-zinc-400 uppercase w-1/3 truncate">{res.exercise}</span>
                                                 <div className="flex flex-wrap justify-end gap-1.5 w-2/3">
-                                                    {res.sets.map((s, j) => (
-                                                        <span key={j} className="bg-zinc-900 text-zinc-300 px-1.5 py-0.5 rounded border border-white/5 font-mono">
-                                                            {s.weight}<span className="text-zinc-600 text-[8px]">x</span>{s.reps}
-                                                        </span>
-                                                    ))}
+                                                    {res.sets.map((s, j) => (<span key={j} className="bg-zinc-900 text-zinc-300 px-1.5 py-0.5 rounded border border-white/5 font-mono">{s.weight}<span className="text-zinc-600 text-[8px]">x</span>{s.reps}</span>))}
                                                 </div>
                                             </div>
                                         ))}
@@ -355,9 +346,7 @@
                         </div>
                     )}
 
-                    {/* --- MODALS --- */}
-
-                    {/* 1. Create Routine Modal */}
+                    {/* MODALS */}
                     {isCreating && (
                         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 animate-enter">
                             <div className="w-full max-w-sm glass p-6 rounded-3xl">
@@ -373,7 +362,6 @@
                         </div>
                     )}
 
-                    {/* 2. Exercise Selector Modal */}
                     {selectorId && (
                         <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col animate-enter">
                             <div className="p-6 flex justify-between items-center bg-black border-b border-white/10">
@@ -386,7 +374,7 @@
                                         <h4 className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-3 pl-1">{category}</h4>
                                         <div className="grid grid-cols-1 gap-2">
                                             {exercises.map(ex => (
-                                                <button key={ex} onClick={() => addExercise(ex)} className="text-left p-4 bg-zinc-900/50 border border-white/5 rounded-2xl text-xs font-bold uppercase hover:bg-zinc-800 hover:border-blue-500/50 transition-all flex justify-between group">
+                                                <button key={ex} onClick={() => addExercise(ex)} className="text-left p-4 bg-zinc-900/50 border border-white/5 rounded-2xl text-xs font-bold uppercase hover:bg-zinc-800 transition-all flex justify-between group">
                                                     <span>{ex}</span>
                                                     <span className="text-blue-500 opacity-0 group-hover:opacity-100 font-black">+</span>
                                                 </button>
@@ -398,14 +386,12 @@
                         </div>
                     )}
 
-                    {/* BOTTOM NAV */}
                     {(view === 'routines' || view === 'history') && (
                         <nav className="fixed bottom-6 left-10 right-10 h-16 glass rounded-2xl flex items-center justify-between px-2 shadow-2xl z-40">
                             <button onClick={() => setView('routines')} className={`flex-1 h-full rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'routines' ? 'bg-white text-black shadow-lg scale-95' : 'text-zinc-500'}`}>Entrenar</button>
                             <button onClick={() => setView('history')} className={`flex-1 h-full rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'history' ? 'bg-white text-black shadow-lg scale-95' : 'text-zinc-500'}`}>Historial</button>
                         </nav>
                     )}
-
                 </div>
             );
         };
