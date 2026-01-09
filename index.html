@@ -2,19 +2,27 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NeuralLift - Secure Access</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NeuralLift AI - Ultimate</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: black; color: white; font-family: -apple-system, sans-serif; overflow-x: hidden; }
+        .glass { background: rgba(15, 15, 15, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); }
+        .neo-blue { color: #3b82f6; text-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        input, select, textarea { color-scheme: dark; }
+    </style>
 </head>
-<body class="bg-black text-white font-sans">
+<body>
     <div id="root"></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, getDocs, limit, query, addDoc, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, getDocs, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDlEh7wcEQaAuXZbBmPHqqgdE2nplXOyPg",
@@ -24,86 +32,230 @@
             messagingSenderId: "446571622978",
             appId: "1:446571622978:web:7e2a2d01eb80f76db3b3db"
         };
-
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        
-        // Exponemos las herramientas necesarias de forma segura
-        window.vault = {
-            verify: async (key) => {
-                try {
-                    const q = query(collection(db, key), limit(1));
-                    await getDocs(q); 
-                    return true; 
-                } catch (e) { return false; }
-            },
-            db, collection, addDoc, onSnapshot, query, orderBy
+        window.vault = { db, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, getDocs, limit,
+            verify: async (key) => { try { await getDocs(query(collection(db, key), limit(1))); return true; } catch(e){ return false; } }
         };
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
+
+        const EXERCISES_DB = {
+            "Pecho": ["Press Banca Horizontal", "Press Inclinado Mancuernas", "Aperturas Polea", "Fondos Pecho", "Chest Press Machine"],
+            "Espalda": ["Dominadas", "Jalón al Pecho", "Remo con Barra", "Remo Gironda", "Pull-over Polea", "Peso Muerto"],
+            "Pierna": ["Sentadilla", "Prensa 45º", "Extensión Cuádriceps", "Curl Femoral", "Zancadas", "Elevación Talones"],
+            "Hombro": ["Press Militar Barra", "Elevaciones Laterales", "Pájaros", "Facepull", "Press Arnold"],
+            "Brazos": ["Curl Bíceps Barra", "Martillo", "Tríceps Polea Cuerda", "Press Francés", "Curl Predicador"]
+        };
 
         function App() {
-            const [pin, setPin] = useState("");
             const [isAuth, setIsAuth] = useState(false);
-            const [loading, setLoading] = useState(false);
+            const [view, setView] = useState('routines');
+            const [routines, setRoutines] = useState([]);
+            const [logs, setLogs] = useState([]);
+            const [activeWorkout, setActiveWorkout] = useState(null);
+            const [aiResponse, setAiResponse] = useState("");
+            const [isAiLoading, setIsAiLoading] = useState(false);
+            
+            // UI States
+            const [showCreator, setShowCreator] = useState(false);
+            const [aiPrompt, setAiPrompt] = useState("");
+
+            const userKey = localStorage.getItem("vault_token");
+            const geminiKey = localStorage.getItem("gemini_key");
+
+            useEffect(() => { if (userKey) setIsAuth(true); }, []);
 
             useEffect(() => {
-                const saved = localStorage.getItem("vault_token");
-                if (saved) setIsAuth(true);
-            }, []);
+                if (!isAuth || !userKey) return;
+                const { db, collection, onSnapshot, query, orderBy } = window.vault;
+                const unsubR = onSnapshot(collection(db, `${userKey}_routines`), (snap) => setRoutines(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                const unsubL = onSnapshot(query(collection(db, `${userKey}_logs`), orderBy("timestamp", "asc")), (snap) => setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                return () => { unsubR(); unsubL(); };
+            }, [isAuth]);
 
-            const handleUnlock = async (e) => {
-                e.preventDefault();
-                setLoading(true);
-                const success = await window.vault.verify(pin);
-                if (success) {
-                    localStorage.setItem("vault_token", pin);
-                    setIsAuth(true);
-                } else {
-                    alert("PIN Inválido. Acceso rechazado por el servidor.");
+            const callGemini = async (promptText) => {
+                let key = localStorage.getItem("gemini_key");
+                if (!key) {
+                    key = prompt("Introduce tu Gemini API Key:");
+                    if (key) localStorage.setItem("gemini_key", key); else return null;
                 }
-                setLoading(false);
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${key}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+                });
+                const data = await resp.json();
+                return data.candidates[0].content.parts[0].text;
             };
 
-            if (!isAuth) {
-                return (
-                    <div className="h-screen flex flex-col items-center justify-center bg-black p-10">
-                        <h1 className="text-2xl font-black italic mb-8 tracking-tighter">NEURAL<span className="text-blue-600">LIFT</span></h1>
-                        <form onSubmit={handleUnlock} className="w-full max-w-xs space-y-4">
-                            <input 
-                                type="password" 
-                                placeholder="PIN MAESTRO" 
-                                value={pin}
-                                onChange={(e) => setPin(e.target.value)}
-                                className="w-full bg-zinc-900 border border-white/5 p-5 rounded-3xl text-center text-xl outline-none focus:border-blue-600"
-                            />
-                            <button className="w-full py-4 bg-white text-black rounded-3xl font-black uppercase text-[10px]">
-                                {loading ? "Verificando..." : "Desbloquear Sistema"}
-                            </button>
-                        </form>
-                    </div>
-                );
-            }
+            const createAiRoutine = async () => {
+                if (!aiPrompt) return;
+                setIsAiLoading(true);
+                const promptText = `Como experto en culturismo, crea una rutina basada en: "${aiPrompt}". 
+                Responde EXCLUSIVAMENTE con un JSON válido con este formato: 
+                {"name": "Nombre de Rutina", "exercises": ["Ejercio 1", "Ejercicio 2"]}. 
+                Usa nombres de ejercicios estándar.`;
+                
+                try {
+                    const result = await callGemini(promptText);
+                    const routineData = JSON.parse(result.substring(result.indexOf('{'), result.lastIndexOf('}') + 1));
+                    await window.vault.addDoc(window.vault.collection(window.vault.db, `${userKey}_routines`), routineData);
+                    setShowCreator(false);
+                    setAiPrompt("");
+                } catch (e) { alert("La IA no pudo formatear la rutina. Intenta ser más específico."); }
+                setIsAiLoading(false);
+            };
+
+            const finishWorkout = async () => {
+                const final = activeWorkout.results.map(r => ({
+                    exercise: r.exercise,
+                    sets: r.sets.filter(s => s.completed && s.weight && s.reps)
+                })).filter(r => r.sets.length > 0);
+                await window.vault.addDoc(window.vault.collection(window.vault.db, `${userKey}_logs`), {
+                    routineName: activeWorkout.name, results: final, timestamp: Date.now()
+                });
+                const aiAdv = await callGemini(`Analiza este entreno de hipertrofia: ${JSON.stringify(final)}. Dime pesos para la próxima vez.`);
+                setAiResponse(aiAdv);
+                setActiveWorkout(null);
+                setView('history');
+            };
+
+            if (!isAuth) return (
+                <div className="h-screen flex flex-col items-center justify-center p-10 bg-black">
+                    <h1 className="text-4xl font-black italic mb-10 text-blue-600 neo-blue tracking-tighter">NEURALLIFT</h1>
+                    <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const pin = e.target.pin.value;
+                        if (await window.vault.verify(pin)) { localStorage.setItem("vault_token", pin); setIsAuth(true); }
+                    }} className="w-full max-w-xs space-y-4">
+                        <input name="pin" type="password" placeholder="PIN" className="w-full bg-zinc-900 p-6 rounded-3xl text-center text-xl outline-none border border-white/5" />
+                        <button className="w-full py-5 bg-white text-black rounded-3xl font-black uppercase text-xs">Entrar</button>
+                    </form>
+                </div>
+            );
 
             return (
-                <div className="p-8 text-center animate-pulse">
-                    <h2 className="text-blue-500 font-black italic text-xl">SISTEMA DESBLOQUEADO</h2>
-                    <p className="text-xs text-zinc-500 mt-6 italic">
-                        Has accedido mediante validación de servidor. 
-                        El código fuente no contiene llaves de acceso.
-                    </p>
-                    <button 
-                        onClick={() => { localStorage.clear(); location.reload(); }} 
-                        className="mt-24 text-[10px] text-zinc-700 uppercase tracking-widest border-b border-zinc-800"
-                    >
-                        Cerrar Sesión y Bloquear
-                    </button>
+                <div className="max-w-md mx-auto p-6 pb-40">
+                    <header className="flex justify-between items-center mb-8 pt-4">
+                        <h1 className="text-xl font-black italic tracking-tighter uppercase">Neural<span className="text-blue-600">Lift</span></h1>
+                        <button onClick={() => setShowCreator(true)} className="bg-blue-600/10 text-blue-500 px-4 py-2 rounded-full text-[10px] font-black uppercase italic">AI Generator</button>
+                    </header>
+
+                    {showCreator && (
+                        <div className="fixed inset-0 z-[100] bg-black/95 p-8 flex flex-col justify-center animate-in fade-in duration-300">
+                            <h2 className="text-2xl font-black italic mb-4 text-blue-600 uppercase">AI Routine Designer</h2>
+                            <textarea 
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                placeholder="Ej: Hazme una rutina de 4 días enfocada en hombros y brazos para hipertrofia..."
+                                className="w-full h-40 bg-zinc-900 border border-white/10 rounded-3xl p-6 text-sm outline-none focus:border-blue-600 mb-6"
+                            ></textarea>
+                            <button onClick={createAiRoutine} disabled={isAiLoading} className="w-full py-5 bg-blue-600 rounded-3xl font-black uppercase text-xs mb-4">
+                                {isAiLoading ? "Analizando Biomecánica..." : "Generar con Gemini 3"}
+                            </button>
+                            <button onClick={() => setShowCreator(false)} className="text-[10px] font-bold text-zinc-600 uppercase">Cancelar</button>
+                        </div>
+                    )}
+
+                    {view === 'routines' && !activeWorkout && (
+                        <div className="space-y-6">
+                            <button onClick={() => {
+                                const n = prompt("Nombre:"); 
+                                if(n) window.vault.addDoc(window.vault.collection(window.vault.db, `${userKey}_routines`), {name: n, exercises: []});
+                            }} className="w-full py-5 border border-dashed border-zinc-800 rounded-[2rem] text-[10px] font-black text-zinc-600 uppercase italic">+ Manual</button>
+                            
+                            {routines.map(r => (
+                                <div key={r.id} className="glass p-8 rounded-[3rem] relative shadow-2xl overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-3xl rounded-full"></div>
+                                    <h3 className="text-2xl font-black uppercase italic mb-2 tracking-tighter">{r.name}</h3>
+                                    <div className="flex flex-wrap gap-2 mb-8">
+                                        {r.exercises.map((e,i) => <span key={i} className="text-[8px] bg-zinc-900 text-zinc-500 px-2 py-1 rounded uppercase font-bold">{e}</span>)}
+                                        <button onClick={() => {
+                                            const ex = prompt("Añade ejercicio o escribe uno nuevo:");
+                                            if(ex) {
+                                                const newEx = [...r.exercises, ex];
+                                                window.vault.addDoc(window.vault.collection(window.vault.db, `${userKey}_routines`), {...r, exercises: newEx});
+                                                window.vault.deleteDoc(window.vault.doc(window.vault.db, `${userKey}_routines`, r.id));
+                                            }
+                                        }} className="text-[8px] border border-zinc-800 px-2 py-1 rounded text-zinc-700 font-bold">+</button>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => {
+                                            setActiveWorkout({name: r.name, results: r.exercises.map(e => ({exercise: e, sets: [{weight:'', reps:'', completed:false}]}))});
+                                            setView('workout');
+                                        }} className="flex-1 py-5 bg-white text-black rounded-3xl font-black text-[10px] uppercase">Iniciar Sesión</button>
+                                        <button onClick={() => window.vault.deleteDoc(window.vault.doc(window.vault.db, `${userKey}_routines`, r.id))} className="w-14 bg-zinc-900 rounded-3xl flex items-center justify-center text-xs text-zinc-600 italic">X</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {view === 'workout' && activeWorkout && (
+                        <div className="space-y-6">
+                            <h2 className="text-3xl font-black italic text-blue-600 uppercase mb-4">{activeWorkout.name}</h2>
+                            {activeWorkout.results.map((ex, exIdx) => (
+                                <div key={exIdx} className="glass p-6 rounded-[2.5rem]">
+                                    <p className="text-[11px] font-black uppercase text-blue-400 mb-5 tracking-widest italic">{ex.exercise}</p>
+                                    {ex.sets.map((set, setIdx) => (
+                                        <div key={setIdx} className="flex gap-2 mb-2">
+                                            <input type="number" placeholder="KG" value={set.weight} onChange={e => {
+                                                const res = [...activeWorkout.results]; res[exIdx].sets[setIdx].weight = e.target.value; setActiveWorkout({...activeWorkout, results: res});
+                                            }} className="w-full bg-zinc-900 p-4 rounded-2xl text-center font-bold text-xl outline-none focus:bg-blue-600/10 transition-colors" />
+                                            <input type="number" placeholder="REPS" value={set.reps} onChange={e => {
+                                                const res = [...activeWorkout.results]; res[exIdx].sets[setIdx].reps = e.target.value; setActiveWorkout({...activeWorkout, results: res});
+                                            }} className="w-full bg-zinc-900 p-4 rounded-2xl text-center font-bold text-xl outline-none focus:bg-blue-600/10 transition-colors" />
+                                            <button onClick={() => {
+                                                const res = [...activeWorkout.results]; res[exIdx].sets[setIdx].completed = !res[exIdx].sets[setIdx].completed; setActiveWorkout({...activeWorkout, results: res});
+                                            }} className={`w-16 rounded-2xl ${set.completed ? 'bg-blue-600 shadow-lg' : 'bg-zinc-800'}`}>✓</button>
+                                        </div>
+                                    ))}
+                                    <button onClick={() => {
+                                        const res = [...activeWorkout.results]; res[exIdx].sets.push({weight:'', reps:'', completed:false}); setActiveWorkout({...activeWorkout, results: res});
+                                    }} className="text-[9px] font-bold text-zinc-700 mt-2 uppercase tracking-widest">+ Serie</button>
+                                </div>
+                            ))}
+                            <button onClick={finishWorkout} className="w-full py-7 bg-white text-black rounded-[3rem] font-black uppercase text-sm shadow-2xl active:scale-95 transition-all">Sincronizar Datos</button>
+                        </div>
+                    )}
+
+                    {view === 'history' && (
+                        <div className="space-y-6">
+                            {aiResponse && (
+                                <div className="p-8 rounded-[3rem] bg-blue-600/5 border border-blue-500/20 shadow-inner">
+                                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mb-4 italic">Neural Insight Gemini 3</p>
+                                    <div className="text-[11px] leading-relaxed text-zinc-300 font-medium whitespace-pre-wrap">{aiResponse}</div>
+                                </div>
+                            )}
+                            {[...logs].reverse().map(l => (
+                                <div key={l.id} className="glass p-7 rounded-[2.5rem]">
+                                    <div className="flex justify-between mb-4">
+                                        <span className="text-xs font-black uppercase text-blue-500 italic">{l.routineName}</span>
+                                        <span className="text-[9px] text-zinc-700 font-bold uppercase">{new Date(l.timestamp).toLocaleDateString()}</span>
+                                    </div>
+                                    {l.results.map((res, i) => (
+                                        <div key={i} className="text-[10px] border-t border-white/5 py-2 flex justify-between items-center">
+                                            <span className="uppercase text-zinc-500 font-bold">{res.exercise}</span>
+                                            <div className="flex gap-1">
+                                                {res.sets.map((s, si) => <span key={si} className="bg-zinc-900 px-2 py-1 rounded text-[9px] text-white font-black italic">{s.weight}k×{s.reps}</span>)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <nav className="fixed bottom-0 left-0 right-0 glass px-8 py-10 flex justify-around border-t border-white/5 rounded-t-[3.5rem] z-[80]">
+                        <button onClick={() => setView('routines')} className={`text-[9px] font-black uppercase italic ${view === 'routines' ? 'text-blue-500' : 'text-zinc-700'}`}>Protocolos</button>
+                        <button onClick={() => setView('history')} className={`text-[9px] font-black uppercase italic ${view === 'history' ? 'text-blue-500' : 'text-zinc-700'}`}>Historial</button>
+                    </nav>
                 </div>
             );
         }
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
