@@ -9,19 +9,25 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; }
+        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
         .glass { background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); }
         .blue-glow { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; }
+        /* Remove arrows from number inputs */
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        .animate-in { animation: fadeUp 0.3s ease-out; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
+    <!-- Firebase Configuration -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, getDocs, limit, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+        // Note: Ensure these keys are valid for your Firebase project
         const firebaseConfig = {
             apiKey: "AIzaSyDlEh7wcEQaAuXZbBmPHqqgdE2nplXOyPg",
             authDomain: "neurallift-ai.firebaseapp.com",
@@ -30,11 +36,19 @@
             messagingSenderId: "446571622978",
             appId: "1:446571622978:web:7e2a2d01eb80f76db3b3db"
         };
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        window.vault = { db, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, getDocs, limit, updateDoc };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            // Expose Firebase tools to global window object for React
+            window.vault = { db, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, getDocs, limit, updateDoc };
+            window.vaultLoaded = true;
+        } catch (e) {
+            console.error("Firebase init error:", e);
+        }
     </script>
 
+    <!-- React Application -->
     <script type="text/babel">
         const { useState, useEffect } = React;
 
@@ -52,24 +66,39 @@
             const [routines, setRoutines] = useState([]);
             const [logs, setLogs] = useState([]);
             const [activeWorkout, setActiveWorkout] = useState(null);
-            const [aiResponse, setAiResponse] = useState("");
-            const [showExSelector, setShowExSelector] = useState(null);
+            
+            // showExSelector now stores the ID of the routine, not the object (prevents stale data bugs)
+            const [showExSelectorId, setShowExSelectorId] = useState(null);
+            const [isLoaded, setIsLoaded] = useState(false);
 
-            // Cargar datos si hay sesión
+            // Wait for Firebase module to load
             useEffect(() => {
-                if (!userKey) return;
+                const checkVault = setInterval(() => {
+                    if (window.vaultLoaded) {
+                        setIsLoaded(true);
+                        clearInterval(checkVault);
+                    }
+                }, 100);
+                return () => clearInterval(checkVault);
+            }, []);
+
+            // Data Sync
+            useEffect(() => {
+                if (!userKey || !isLoaded) return;
                 const { db, collection, onSnapshot, query, orderBy } = window.vault;
                 
+                // Listen to Routines
                 const unsubR = onSnapshot(collection(db, `${userKey}_routines`), (snap) => {
                     setRoutines(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
                 
+                // Listen to Logs
                 const unsubL = onSnapshot(query(collection(db, `${userKey}_logs`), orderBy("timestamp", "desc")), (snap) => {
                     setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
 
                 return () => { unsubR(); unsubL(); };
-            }, [userKey]);
+            }, [userKey, isLoaded]);
 
             const login = (e) => {
                 e.preventDefault();
@@ -80,75 +109,113 @@
                 }
             };
 
-            const addExerciseToRoutine = async (routine, exerciseName) => {
+            const addExerciseToRoutine = async (routineId, exerciseName) => {
                 const { db, doc, updateDoc } = window.vault;
-                const newExercises = [...(routine.exercises || []), exerciseName];
-                const routineRef = doc(db, `${userKey}_routines`, routine.id);
+                // Find current state of routine to avoid overwriting data
+                const currentRoutine = routines.find(r => r.id === routineId);
+                if (!currentRoutine) return;
+
+                const newExercises = [...(currentRoutine.exercises || []), exerciseName];
+                const routineRef = doc(db, `${userKey}_routines`, routineId);
+                
                 await updateDoc(routineRef, { exercises: newExercises });
-                setShowExSelector(null);
+                setShowExSelectorId(null);
             };
 
+            const updateWorkoutSet = (exIdx, setIdx, field, value) => {
+                // Use structuredClone to deeply copy the activeWorkout object (prevents mutation bugs)
+                const newWorkout = structuredClone(activeWorkout);
+                newWorkout.results[exIdx].sets[setIdx][field] = value;
+                setActiveWorkout(newWorkout);
+            };
+
+            const toggleSetComplete = (exIdx, setIdx) => {
+                const newWorkout = structuredClone(activeWorkout);
+                newWorkout.results[exIdx].sets[setIdx].completed = !newWorkout.results[exIdx].sets[setIdx].completed;
+                setActiveWorkout(newWorkout);
+            };
+
+            const addSet = (exIdx) => {
+                const newWorkout = structuredClone(activeWorkout);
+                newWorkout.results[exIdx].sets.push({weight:'', reps:'', completed:false});
+                setActiveWorkout(newWorkout);
+            };
+
+            // Loading State
+            if (!isLoaded) return <div className="h-screen bg-black flex items-center justify-center text-zinc-500 text-xs uppercase tracking-widest">Conectando...</div>;
+
+            // Login Screen
             if (!userKey) return (
-                <div className="h-screen flex flex-col items-center justify-center p-8 bg-black">
+                <div className="h-screen flex flex-col items-center justify-center p-8 bg-black animate-in">
                     <h1 className="text-4xl font-black italic mb-10 text-blue-600 tracking-tighter uppercase">NeuralLift AI</h1>
                     <form onSubmit={login} className="w-full max-w-xs space-y-4">
-                        <input name="pin" type="password" placeholder="INGRESA TU PIN" className="w-full bg-zinc-900 p-6 rounded-3xl text-center text-xl outline-none border border-white/5 focus:border-blue-600" />
-                        <button className="w-full py-5 bg-white text-black rounded-3xl font-black uppercase text-xs tracking-widest">Desbloquear</button>
+                        <input name="pin" type="password" placeholder="INGRESA TU PIN" className="w-full bg-zinc-900 p-6 rounded-3xl text-center text-xl outline-none border border-white/5 focus:border-blue-600 transition-colors text-white" />
+                        <button className="w-full py-5 bg-white text-black rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-zinc-200 transition-colors">Desbloquear</button>
                     </form>
                 </div>
             );
 
             return (
-                <div className="max-w-md mx-auto p-6 pb-40 min-h-screen">
+                <div className="max-w-md mx-auto p-6 pb-40 min-h-screen animate-in">
                     <header className="flex justify-between items-center mb-10 pt-4">
                         <h1 className="text-xl font-black italic tracking-tighter uppercase">Neural<span className="text-blue-600">Lift</span></h1>
                         <button onClick={() => {localStorage.clear(); window.location.reload();}} className="text-[10px] text-zinc-700 font-bold uppercase">Logout</button>
                     </header>
 
+                    {/* ROUTINES VIEW */}
                     {view === 'routines' && !activeWorkout && (
                         <div className="space-y-6">
                             <button onClick={async () => {
                                 const n = prompt("Nombre de la rutina:");
                                 if(n) await window.vault.addDoc(window.vault.collection(window.vault.db, `${userKey}_routines`), {name: n, exercises: []});
-                            }} className="w-full py-5 border border-dashed border-zinc-800 rounded-[2rem] text-[10px] font-black text-zinc-600 uppercase italic">+ Nuevo Protocolo Manual</button>
+                            }} className="w-full py-5 border border-dashed border-zinc-800 rounded-[2rem] text-[10px] font-black text-zinc-600 uppercase italic hover:bg-zinc-900/50 transition-colors">+ Nuevo Protocolo Manual</button>
 
                             {routines.map(r => (
                                 <div key={r.id} className="glass p-8 rounded-[2.5rem] relative">
                                     <h3 className="text-2xl font-black uppercase italic mb-2 tracking-tighter">{r.name}</h3>
                                     <div className="flex flex-wrap gap-2 mb-8">
                                         {(r.exercises || []).map((ex, i) => (
-                                            <span key={i} className="text-[9px] bg-zinc-900 text-zinc-400 px-2 py-1 rounded-md font-bold uppercase border border-white/5">{ex}</span>
+                                            <span key={`${r.id}-${i}`} className="text-[9px] bg-zinc-900 text-zinc-400 px-2 py-1 rounded-md font-bold uppercase border border-white/5">{ex}</span>
                                         ))}
-                                        <button onClick={() => setShowExSelector(r)} className="text-[9px] bg-blue-600/20 text-blue-500 px-3 py-1 rounded-md font-black">+</button>
+                                        <button onClick={() => setShowExSelectorId(r.id)} className="text-[9px] bg-blue-600/20 text-blue-500 px-3 py-1 rounded-md font-black hover:bg-blue-600/30 transition-colors">+</button>
                                     </div>
                                     <div className="flex gap-2">
                                         <button 
                                             disabled={!r.exercises?.length}
                                             onClick={() => {
-                                                setActiveWorkout({name: r.name, results: r.exercises.map(ex => ({exercise: ex, sets: [{weight:'', reps:'', completed:false}]}))});
+                                                setActiveWorkout({
+                                                    name: r.name, 
+                                                    results: r.exercises.map(ex => ({
+                                                        exercise: ex, 
+                                                        sets: [{weight:'', reps:'', completed:false}]
+                                                    }))
+                                                });
                                                 setView('workout');
-                                            }} className={`flex-1 py-5 rounded-3xl font-black text-[10px] uppercase tracking-widest ${r.exercises?.length ? 'bg-blue-600' : 'bg-zinc-800 text-zinc-600'}`}>
+                                            }} className={`flex-1 py-5 rounded-3xl font-black text-[10px] uppercase tracking-widest transition-colors ${r.exercises?.length ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-600'}`}>
                                             {r.exercises?.length ? 'Iniciar Sesión' : 'Añade Ejercicios'}
                                         </button>
-                                        <button onClick={() => window.vault.deleteDoc(window.vault.doc(window.vault.db, `${userKey}_routines`, r.id))} className="w-14 bg-zinc-900 rounded-3xl flex items-center justify-center text-zinc-700 text-xs">X</button>
+                                        <button onClick={() => {
+                                            if(confirm("¿Borrar rutina?")) window.vault.deleteDoc(window.vault.doc(window.vault.db, `${userKey}_routines`, r.id));
+                                        }} className="w-14 bg-zinc-900 rounded-3xl flex items-center justify-center text-zinc-700 text-xs hover:text-red-500 transition-colors">X</button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {showExSelector && (
-                        <div className="fixed inset-0 z-[100] bg-black/95 p-8 overflow-y-auto animate-in fade-in">
+                    {/* EXERCISE SELECTOR MODAL */}
+                    {showExSelectorId && (
+                        <div className="fixed inset-0 z-[100] bg-black/95 p-8 overflow-y-auto animate-in">
                             <div className="flex justify-between items-center mb-8">
                                 <h2 className="text-xl font-black italic uppercase text-blue-600">Seleccionar Ejercicio</h2>
-                                <button onClick={() => setShowExSelector(null)} className="text-zinc-500 text-xs font-bold uppercase underline">Cerrar</button>
+                                <button onClick={() => setShowExSelectorId(null)} className="text-zinc-500 text-xs font-bold uppercase underline">Cerrar</button>
                             </div>
                             {Object.entries(EXERCISES_DB).map(([cat, exs]) => (
                                 <div key={cat} className="mb-8">
                                     <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">{cat}</p>
                                     <div className="grid grid-cols-1 gap-2">
                                         {exs.map(ex => (
-                                            <button key={ex} onClick={() => addExerciseToRoutine(showExSelector, ex)} className="w-full text-left p-5 bg-zinc-900 rounded-2xl text-[11px] font-bold uppercase border border-white/5 active:bg-blue-600">{ex}</button>
+                                            <button key={ex} onClick={() => addExerciseToRoutine(showExSelectorId, ex)} className="w-full text-left p-5 bg-zinc-900 rounded-2xl text-[11px] font-bold uppercase border border-white/5 active:bg-blue-600 transition-colors">{ex}</button>
                                         ))}
                                     </div>
                                 </div>
@@ -156,49 +223,76 @@
                         </div>
                     )}
 
+                    {/* ACTIVE WORKOUT VIEW */}
                     {view === 'workout' && activeWorkout && (
                         <div className="space-y-6">
                             <div className="flex justify-between items-end mb-4">
                                 <h2 className="text-3xl font-black italic text-blue-600 uppercase">{activeWorkout.name}</h2>
-                                <button onClick={() => setView('routines')} className="text-zinc-700 text-[10px] font-bold uppercase underline">Cancelar</button>
+                                <button onClick={() => {
+                                    if(confirm("¿Cancelar entrenamiento? Se perderán los datos.")) {
+                                        setActiveWorkout(null);
+                                        setView('routines');
+                                    }
+                                }} className="text-zinc-700 text-[10px] font-bold uppercase underline">Cancelar</button>
                             </div>
                             {activeWorkout.results.map((ex, exIdx) => (
                                 <div key={exIdx} className="glass p-6 rounded-[2.5rem]">
                                     <p className="text-[10px] font-black uppercase text-zinc-500 mb-4 tracking-widest">{ex.exercise}</p>
                                     {ex.sets.map((set, setIdx) => (
                                         <div key={setIdx} className="flex gap-2 mb-2">
-                                            <input type="number" placeholder="KG" value={set.weight} onChange={e => {
-                                                const res = [...activeWorkout.results]; res[exIdx].sets[setIdx].weight = e.target.value; setActiveWorkout({...activeWorkout, results: res});
-                                            }} className="w-full bg-black border border-white/5 p-4 rounded-2xl text-center font-bold text-xl outline-none focus:border-blue-600" />
-                                            <input type="number" placeholder="REPS" value={set.reps} onChange={e => {
-                                                const res = [...activeWorkout.results]; res[exIdx].sets[setIdx].reps = e.target.value; setActiveWorkout({...activeWorkout, results: res});
-                                            }} className="w-full bg-black border border-white/5 p-4 rounded-2xl text-center font-bold text-xl outline-none focus:border-blue-600" />
-                                            <button onClick={() => {
-                                                const res = [...activeWorkout.results]; res[exIdx].sets[setIdx].completed = !res[exIdx].sets[setIdx].completed; setActiveWorkout({...activeWorkout, results: res});
-                                            }} className={`w-16 rounded-2xl flex items-center justify-center ${set.completed ? 'bg-blue-600' : 'bg-zinc-900 text-zinc-800'}`}>✓</button>
+                                            <input 
+                                                type="number" // Changed to number for mobile
+                                                inputMode="decimal" 
+                                                autoComplete="off"
+                                                placeholder="KG" 
+                                                value={set.weight} 
+                                                onChange={e => updateWorkoutSet(exIdx, setIdx, 'weight', e.target.value)} 
+                                                className="w-full bg-black border border-white/5 p-4 rounded-2xl text-center font-bold text-xl outline-none focus:border-blue-600 text-white" 
+                                            />
+                                            <input 
+                                                type="number" 
+                                                inputMode="decimal"
+                                                autoComplete="off"
+                                                placeholder="REPS" 
+                                                value={set.reps} 
+                                                onChange={e => updateWorkoutSet(exIdx, setIdx, 'reps', e.target.value)} 
+                                                className="w-full bg-black border border-white/5 p-4 rounded-2xl text-center font-bold text-xl outline-none focus:border-blue-600 text-white" 
+                                            />
+                                            <button 
+                                                onClick={() => toggleSetComplete(exIdx, setIdx)} 
+                                                className={`w-16 rounded-2xl flex items-center justify-center transition-all ${set.completed ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-zinc-900 text-zinc-800'}`}>
+                                                ✓
+                                            </button>
                                         </div>
                                     ))}
-                                    <button onClick={() => {
-                                        const res = [...activeWorkout.results]; res[exIdx].sets.push({weight:'', reps:'', completed:false}); setActiveWorkout({...activeWorkout, results: res});
-                                    }} className="text-[9px] font-black text-zinc-700 mt-2 uppercase">+ Añadir Serie</button>
+                                    <button onClick={() => addSet(exIdx)} className="text-[9px] font-black text-zinc-700 mt-2 uppercase hover:text-blue-500 transition-colors">+ Añadir Serie</button>
                                 </div>
                             ))}
                             <button onClick={async () => {
+                                // Filter out empty sets
                                 const results = activeWorkout.results.map(r => ({
                                     exercise: r.exercise,
                                     sets: r.sets.filter(s => s.completed && s.weight && s.reps)
                                 })).filter(r => r.sets.length > 0);
+
+                                if (results.length === 0) {
+                                    alert("Completa al menos una serie para guardar.");
+                                    return;
+                                }
+
                                 await window.vault.addDoc(window.vault.collection(window.vault.db, `${userKey}_logs`), {
                                     routineName: activeWorkout.name, results, timestamp: Date.now()
                                 });
                                 setActiveWorkout(null);
                                 setView('history');
-                            }} className="w-full py-6 bg-white text-black rounded-3xl font-black uppercase text-xs tracking-widest">Finalizar Entrenamiento</button>
+                            }} className="w-full py-6 bg-white text-black rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-zinc-200 transition-colors">Finalizar Entrenamiento</button>
                         </div>
                     )}
 
+                    {/* HISTORY VIEW */}
                     {view === 'history' && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 pb-20">
+                            {logs.length === 0 && <p className="text-center text-zinc-700 text-xs font-bold uppercase italic mt-10">Sin entrenamientos previos</p>}
                             {logs.map(l => (
                                 <div key={l.id} className="glass p-7 rounded-[2.5rem]">
                                     <div className="flex justify-between mb-4">
@@ -208,8 +302,8 @@
                                     {l.results.map((res, i) => (
                                         <div key={i} className="text-[10px] border-t border-white/5 py-3 flex justify-between items-center font-medium">
                                             <span className="uppercase text-zinc-500 font-bold">{res.exercise}</span>
-                                            <div className="flex gap-1.5 flex-wrap justify-end">
-                                                {res.sets.map((s, si) => <span key={si} className="bg-zinc-900 px-2 py-1 rounded text-[9px] font-black italic">{s.weight}k×{s.reps}</span>)}
+                                            <div className="flex gap-1.5 flex-wrap justify-end max-w-[60%]">
+                                                {res.sets.map((s, si) => <span key={si} className="bg-zinc-900 px-2 py-1 rounded text-[9px] font-black italic border border-white/5 text-zinc-300">{s.weight}k×{s.reps}</span>)}
                                             </div>
                                         </div>
                                     ))}
@@ -218,9 +312,10 @@
                         </div>
                     )}
 
-                    <nav className="fixed bottom-0 left-0 right-0 glass px-12 py-10 flex justify-around border-t border-white/5 rounded-t-[3rem] z-[80]">
-                        <button onClick={() => setView('routines')} className={`text-[10px] font-black uppercase italic ${view === 'routines' ? 'text-blue-500' : 'text-zinc-700'}`}>Entrenar</button>
-                        <button onClick={() => setView('history')} className={`text-[10px] font-black uppercase italic ${view === 'history' ? 'text-blue-500' : 'text-zinc-700'}`}>Historial</button>
+                    {/* NAVIGATION */}
+                    <nav className="fixed bottom-0 left-0 right-0 glass px-12 py-8 flex justify-around border-t border-white/5 rounded-t-[3rem] z-[80] shadow-2xl shadow-black">
+                        <button onClick={() => setView('routines')} className={`text-[10px] font-black uppercase italic transition-colors ${view === 'routines' || view === 'workout' ? 'text-blue-500' : 'text-zinc-700'}`}>Entrenar</button>
+                        <button onClick={() => setView('history')} className={`text-[10px] font-black uppercase italic transition-colors ${view === 'history' ? 'text-blue-500' : 'text-zinc-700'}`}>Historial</button>
                     </nav>
                 </div>
             );
