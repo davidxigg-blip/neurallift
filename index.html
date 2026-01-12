@@ -3,215 +3,567 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gym Progress Pro - Login</title>
+    <title>Gym OS Pro 2026 - Performance & Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* (Mantenemos los estilos anteriores y añadimos los de Auth) */
         :root {
-            --bg-dark: #0f1419;
-            --bg-card: #1a1f2e;
-            --primary: #d0ff00;
-            --text-main: #ffffff;
-            --text-dim: #808191;
-            --danger: #ff453a;
+            --brand-primary: #6366f1;
+            --brand-accent: #f43f5e;
+            --bg-dark: #020617;
+            --glass: rgba(15, 23, 42, 0.8);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: sans-serif; background: var(--bg-dark); color: white; }
-
-        /* Estilos Pantalla de Auth */
-        #authScreen {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
+        body {
+            background-color: var(--bg-dark);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: #f8fafc;
+            overflow-x: hidden;
         }
 
-        .auth-card {
-            background: var(--bg-card);
-            padding: 30px;
-            border-radius: 20px;
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
-        /* Estilos App (oculta por defecto) */
-        #mainApp { display: none; max-width: 480px; margin: 0 auto; background: var(--bg-card); min-height: 100vh; }
+        .nav-tab {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
 
-        .form-group { margin-bottom: 15px; text-align: left; }
-        input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333; background: #000; color: white; }
-        .btn-primary { width: 100%; padding: 12px; background: var(--primary); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .toggle-auth { margin-top: 15px; font-size: 0.8em; color: var(--text-dim); cursor: pointer; }
+        .nav-tab.active {
+            color: white;
+        }
+
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 25%;
+            width: 50%;
+            height: 3px;
+            background: var(--brand-primary);
+            border-radius: 10px 10px 0 0;
+            box-shadow: 0 -4px 10px var(--brand-primary);
+        }
+
+        .set-row {
+            transition: all 0.3s ease;
+        }
+
+        .set-row.completed {
+            background: rgba(34, 197, 94, 0.05);
+            border-color: rgba(34, 197, 94, 0.2);
+            opacity: 0.6;
+        }
+
+        .btn-action {
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .btn-action:active {
+            transform: scale(0.95);
+        }
+
+        .progress-bar {
+            transition: width 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+        }
+
+        .timer-animate {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
         
-        /* Logout */
-        .logout-btn { background: none; border: 1px solid var(--danger); color: var(--danger); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.7em; }
-        
-        /* (Mantenemos los estilos de tabs y cards del código anterior aquí...) */
-        .tabs { display: flex; padding: 10px; gap: 5px; }
-        .tab { flex: 1; padding: 10px; background: #252a3a; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        .tab.active { background: var(--primary); color: black; }
-        .section { display: none; padding: 20px; }
-        .section.active { display: block; }
-        .workout-card { background: #252a3a; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
     </style>
 </head>
-<body>
+<body class="min-h-screen pb-32">
 
-<div id="authScreen">
-    <div class="auth-card">
-        <h2 id="authTitle" style="margin-bottom: 20px;">Iniciar Sesión</h2>
-        <form id="authForm">
-            <div class="form-group">
-                <label>Correo Electrónico</label>
-                <input type="email" id="userEmail" required>
-            </div>
-            <div class="form-group">
-                <label>Contraseña</label>
-                <input type="password" id="userPass" required>
-            </div>
-            <button type="submit" class="btn-primary" id="authBtn">Entrar</button>
-        </form>
-        <p class="toggle-auth" onclick="toggleAuthMode()">¿No tienes cuenta? Regístrate aquí</p>
-    </div>
-</div>
-
-<div id="mainApp">
-    <header style="padding: 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <h1 style="font-size: 1.2em;">💪 Gym Tracker</h1>
-            <span id="displayUser" style="font-size: 0.7em; color: var(--text-dim);"></span>
-        </div>
-        <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
-    </header>
-
-    <nav class="tabs">
-        <button class="tab active" onclick="switchTab('log')">Log</button>
-        <button class="tab" onclick="switchTab('history')">Historial</button>
-    </nav>
-
-    <main>
-        <section id="logSection" class="section active">
-            <form id="workoutForm">
-                <div class="form-group">
-                    <label>Ejercicio</label>
-                    <input type="text" id="exercise" required>
-                </div>
-                <div class="form-group">
-                    <label>Sets / Reps / Peso</label>
-                    <div style="display: flex; gap: 5px;">
-                        <input type="number" id="sets" placeholder="Sets" required>
-                        <input type="number" id="reps" placeholder="Reps" required>
-                        <input type="number" id="weight" placeholder="kg">
+    <!-- TOP NAVIGATION -->
+    <nav class="sticky top-0 z-50 glass-panel border-b border-white/5">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="h-20 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                    <div>
+                        <h1 class="font-black text-lg tracking-tight leading-none">GYMOS <span class="text-indigo-500">PRO</span></h1>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Alpha Edition</p>
                     </div>
                 </div>
-                <button type="submit" class="btn-primary">Añadir a mi perfil</button>
-            </form>
-        </section>
+                
+                <div class="flex items-center gap-4">
+                    <div class="hidden md:flex flex-col items-end">
+                        <span id="streak-count" class="text-sm font-black text-orange-500">🔥 0 Días</span>
+                        <span class="text-[9px] font-bold text-slate-500 uppercase">Racha Actual</span>
+                    </div>
+                    <div id="rest-timer-display" class="hidden bg-slate-900 border border-white/10 px-4 py-2 rounded-xl flex items-center gap-3">
+                        <span class="w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
+                        <span id="timer-seconds" class="font-mono font-bold text-rose-400 text-sm">00:00</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-center gap-8">
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab active py-4 text-[11px] font-black uppercase tracking-widest text-slate-500">Panel</button>
+                <button onclick="switchTab('train')" id="tab-train" class="nav-tab py-4 text-[11px] font-black uppercase tracking-widest text-slate-500">Entrenar</button>
+                <button onclick="switchTab('routines')" id="tab-routines" class="nav-tab py-4 text-[11px] font-black uppercase tracking-widest text-slate-500">Rutinas</button>
+            </div>
+        </div>
+    </nav>
 
-        <section id="historySection" class="section">
-            <div id="workoutList"></div>
-        </section>
+    <main class="max-w-6xl mx-auto px-6 pt-8">
+        
+        <!-- SECTION: DASHBOARD -->
+        <div id="section-dashboard" class="space-y-8 animate-in">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-panel p-6 rounded-[2rem] border-l-4 border-indigo-500">
+                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Volumen Semanal</p>
+                    <h3 id="stat-volume" class="text-3xl font-black text-white">0 <span class="text-sm text-slate-500">kg</span></h3>
+                </div>
+                <div class="glass-panel p-6 rounded-[2rem] border-l-4 border-emerald-500">
+                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Series Totales</p>
+                    <h3 id="stat-sets" class="text-3xl font-black text-white">0 <span class="text-sm text-slate-500">sets</span></h3>
+                </div>
+                <div class="glass-panel p-6 rounded-[2rem] border-l-4 border-amber-500">
+                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Puntos de Fuerza</p>
+                    <h3 id="stat-points" class="text-3xl font-black text-white">0 <span class="text-sm text-slate-500">pts</span></h3>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <h3 class="text-xl font-black flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Actividad Reciente
+                </h3>
+                <div id="workout-history" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- History logs here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION: ENTRENAMIENTO -->
+        <div id="section-train" class="hidden space-y-8">
+            <div class="flex items-center justify-between bg-white/5 p-6 rounded-[2rem] border border-white/5">
+                <div>
+                    <h2 class="text-2xl font-black">Sesión en Curso</h2>
+                    <div class="flex items-center gap-2 mt-1">
+                        <div class="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div id="session-progress" class="progress-bar h-full bg-indigo-500 w-0"></div>
+                        </div>
+                        <span id="progress-text" class="text-[10px] font-bold text-slate-500 uppercase">0% completado</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <input type="date" id="workout-date" class="bg-transparent border-none text-indigo-400 font-bold text-sm focus:ring-0">
+                </div>
+            </div>
+
+            <div id="active-session-container" class="space-y-6">
+                <!-- Se llena al iniciar rutina -->
+                <div class="glass-panel p-16 text-center rounded-[3rem] border-dashed border-2 border-white/10">
+                    <div class="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">🏗️</div>
+                    <h3 class="text-xl font-black text-white mb-2">No hay rutina activa</h3>
+                    <p class="text-slate-500 text-sm mb-8">Selecciona una rutina o crea una nueva para empezar a mutar.</p>
+                    <button onclick="switchTab('routines')" class="px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl text-xs uppercase tracking-widest transition-all shadow-xl shadow-indigo-500/20">
+                        Ir a Configurador
+                    </button>
+                </div>
+            </div>
+
+            <div id="session-actions" class="hidden">
+                <button onclick="saveFullSession()" class="btn-action w-full py-6 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-[2rem] text-white font-black text-lg shadow-2xl shadow-indigo-600/30">
+                    FINALIZAR ENTRENAMIENTO
+                </button>
+            </div>
+        </div>
+
+        <!-- SECTION: CONFIGURAR RUTINAS -->
+        <div id="section-routines" class="hidden space-y-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div class="lg:col-span-5">
+                    <div class="glass-panel p-8 rounded-[2.5rem] sticky top-28">
+                        <h3 class="text-xl font-black mb-6">Librería de Ejercicios</h3>
+                        <div class="relative mb-6">
+                            <input type="text" id="lib-search" placeholder="Buscar..." class="w-full bg-slate-900 border border-white/5 px-6 py-4 rounded-2xl text-sm font-bold focus:border-indigo-500 focus:ring-0 outline-none">
+                        </div>
+                        <div id="library-list" class="h-[400px] overflow-y-auto no-scrollbar space-y-6 pr-2"></div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7">
+                    <div class="glass-panel p-8 rounded-[2.5rem]">
+                        <div class="flex justify-between items-center mb-8">
+                            <div>
+                                <h3 class="text-2xl font-black">Editor de Rutina</h3>
+                                <p class="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Arrastra y configura</p>
+                            </div>
+                            <button onclick="clearRoutine()" class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+
+                        <div id="routine-config-list" class="space-y-4 mb-8 min-h-[100px]"></div>
+
+                        <button onclick="startRoutine()" id="start-btn" class="hidden w-full py-5 bg-white text-slate-950 font-black rounded-[1.5rem] hover:bg-slate-200 transition-all">
+                            EMPEZAR RUTINA AHORA
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
-</div>
 
-<script>
-    let currentUser = JSON.parse(localStorage.getItem('session')) || null;
-    let isLoginMode = true;
+    <!-- UI COMPONENTS -->
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 glass-panel border-indigo-500/50 px-8 py-4 rounded-2xl opacity-0 translate-y-10 transition-all duration-500 z-[100] font-black text-[10px] uppercase tracking-widest text-white shadow-2xl">
+        Mensaje
+    </div>
 
-    // --- Lógica de Autenticación ---
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    function toggleAuthMode() {
-        isLoginMode = !isLoginMode;
-        document.getElementById('authTitle').innerText = isLoginMode ? 'Iniciar Sesión' : 'Crear Cuenta';
-        document.getElementById('authBtn').innerText = isLoginMode ? 'Entrar' : 'Registrarme';
-        document.querySelector('.toggle-auth').innerText = isLoginMode ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión';
-    }
-
-    document.getElementById('authForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const email = document.getElementById('userEmail').value;
-        const pass = document.getElementById('userPass').value;
-        const users = JSON.parse(localStorage.getItem('gymUsers')) || [];
-
-        if (isLoginMode) {
-            const user = users.find(u => u.email === email && u.pass === pass);
-            if (user) {
-                login(user);
-            } else {
-                alert('Credenciales incorrectas');
-            }
-        } else {
-            if (users.find(u => u.email === email)) return alert('El correo ya existe');
-            const newUser = { email, pass };
-            users.push(newUser);
-            localStorage.setItem('gymUsers', JSON.stringify(users));
-            login(newUser);
-        }
-    });
-
-    function login(user) {
-        currentUser = user;
-        localStorage.setItem('session', JSON.stringify(user));
-        document.getElementById('authScreen').style.display = 'none';
-        document.getElementById('mainApp').style.display = 'block';
-        document.getElementById('displayUser').innerText = user.email;
-        renderHistory();
-    }
-
-    function logout() {
-        localStorage.removeItem('session');
-        location.reload();
-    }
-
-    // --- Lógica de Entrenamientos (Vinculados al usuario) ---
-
-    document.getElementById('workoutForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        // Guardamos los entrenamientos usando una llave única por usuario: 'workouts_email'
-        const userKey = `workouts_${currentUser.email}`;
-        const userWorkouts = JSON.parse(localStorage.getItem(userKey)) || [];
-
-        const newWorkout = {
-            id: Date.now(),
-            exercise: document.getElementById('exercise').value,
-            sets: document.getElementById('sets').value,
-            reps: document.getElementById('reps').value,
-            weight: document.getElementById('weight').value || 0,
-            date: new Date().toISOString()
+        // CONFIG
+        const EXERCISES = {
+            "Empuje": ["Press Banca", "Press Militar", "Aperturas", "Fondos", "Elev. Laterales", "Press Francés"],
+            "Tracción": ["Dominadas", "Remo c/ Barra", "Jalón Pecho", "Peso Muerto", "Face Pulls", "Curl Bíceps"],
+            "Pierna": ["Sentadilla", "Prensa 45°", "Ext. Cuádriceps", "Curl Femoral", "Zancadas", "Gemelos"],
+            "Core": ["Plancha", "Rueda Abdominal", "Leg Raises", "Crunch Cable"]
         };
 
-        userWorkouts.unshift(newWorkout);
-        localStorage.setItem(userKey, JSON.stringify(userWorkouts));
-        e.target.reset();
-        switchTab('history');
-        renderHistory();
-    });
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'gym-os-ultra-26';
 
-    function renderHistory() {
-        const userKey = `workouts_${currentUser.email}`;
-        const list = JSON.parse(localStorage.getItem(userKey)) || [];
-        const container = document.getElementById('workoutList');
+        let user = null;
+        let myPlannedRoutine = JSON.parse(localStorage.getItem('planned_routine_v2') || '[]');
+        let activeSession = null;
+        let timerInterval = null;
+
+        // TABS
+        window.switchTab = (tab) => {
+            const tabs = ['dashboard', 'train', 'routines'];
+            tabs.forEach(t => {
+                document.getElementById(`section-${t}`).classList.toggle('hidden', t !== tab);
+                document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+            });
+        };
+
+        // LIBRERÍA
+        const renderLibrary = (filter = "") => {
+            const list = document.getElementById('library-list');
+            list.innerHTML = "";
+            Object.entries(EXERCISES).forEach(([cat, exs]) => {
+                const filtered = exs.filter(e => e.toLowerCase().includes(filter.toLowerCase()));
+                if (filtered.length === 0) return;
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <p class="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-3 px-1">${cat}</p>
+                    <div class="grid grid-cols-1 gap-2">
+                        ${filtered.map(ex => `
+                            <button onclick="addToPlan('${ex}', '${cat}')" class="w-full text-left bg-white/5 px-5 py-4 rounded-2xl text-sm font-bold text-slate-300 hover:border-indigo-500 border border-transparent transition-all flex justify-between items-center group">
+                                ${ex}
+                                <span class="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity font-black">+</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        };
+
+        window.addToPlan = (name, cat) => {
+            if (myPlannedRoutine.some(p => p.name === name)) return;
+            myPlannedRoutine.push({ name, cat, sets: 3, reps: 10 });
+            updatePlanUI();
+            showToast(`Añadido: ${name}`);
+        };
+
+        window.updatePlanUI = () => {
+            localStorage.setItem('planned_routine_v2', JSON.stringify(myPlannedRoutine));
+            const list = document.getElementById('routine-config-list');
+            const startBtn = document.getElementById('start-btn');
+            
+            if (myPlannedRoutine.length === 0) {
+                list.innerHTML = `<div class="p-10 text-center text-slate-600 italic text-sm">Añade ejercicios para configurar tu rutina.</div>`;
+                startBtn.classList.add('hidden');
+                return;
+            }
+
+            startBtn.classList.remove('hidden');
+            list.innerHTML = myPlannedRoutine.map((item, idx) => `
+                <div class="bg-white/5 border border-white/5 p-5 rounded-[1.5rem] flex items-center gap-4 group">
+                    <div class="flex-1">
+                        <p class="font-black text-white text-sm">${item.name}</p>
+                        <p class="text-[9px] text-slate-500 uppercase font-black tracking-tighter">${item.cat}</p>
+                    </div>
+                    <div class="flex items-center gap-4 bg-slate-900/50 px-4 py-2 rounded-xl">
+                        <div class="text-center">
+                            <span class="block text-[8px] text-slate-600 font-black">SETS</span>
+                            <input type="number" value="${item.sets}" onchange="updatePlanItem(${idx}, 'sets', this.value)" class="w-8 bg-transparent text-center font-black text-indigo-400 outline-none">
+                        </div>
+                        <div class="text-center">
+                            <span class="block text-[8px] text-slate-600 font-black">REPS</span>
+                            <input type="number" value="${item.reps}" onchange="updatePlanItem(${idx}, 'reps', this.value)" class="w-8 bg-transparent text-center font-black text-indigo-400 outline-none">
+                        </div>
+                    </div>
+                    <button onclick="removePlanItem(${idx})" class="text-slate-700 hover:text-rose-500 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2.5" stroke-linecap="round"/></svg>
+                    </button>
+                </div>
+            `).join('');
+        };
+
+        window.updatePlanItem = (i, k, v) => { myPlannedRoutine[i][k] = parseInt(v) || 0; localStorage.setItem('planned_routine_v2', JSON.stringify(myPlannedRoutine)); };
+        window.removePlanItem = (i) => { myPlannedRoutine.splice(i, 1); updatePlanUI(); };
+        window.clearRoutine = () => { if(confirm("¿Vaciar configuración?")) { myPlannedRoutine = []; updatePlanUI(); } };
+
+        // ENTRENAMIENTO ACTIVO
+        window.startRoutine = () => {
+            activeSession = myPlannedRoutine.map(ex => ({
+                ...ex,
+                actual: Array.from({ length: ex.sets }, () => ({ weight: "", reps: ex.reps, done: false }))
+            }));
+            renderActiveSession();
+            switchTab('train');
+            document.getElementById('session-actions').classList.remove('hidden');
+            showToast("Rutina Iniciada - ¡Dale fuerte!");
+            updateProgressBar();
+        };
+
+        const renderActiveSession = () => {
+            const container = document.getElementById('active-session-container');
+            if (!activeSession) return;
+            
+            container.innerHTML = activeSession.map((ex, exIdx) => `
+                <div class="glass-panel p-6 md:p-8 rounded-[2.5rem] space-y-5">
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-xl font-black text-white">${ex.name}</h4>
+                        <span class="text-[9px] font-black text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-lg uppercase">${ex.cat}</span>
+                    </div>
+                    <div class="space-y-3">
+                        ${ex.actual.map((s, sIdx) => `
+                            <div class="set-row flex items-center gap-3 p-3 rounded-2xl border border-white/5 ${s.done ? 'completed' : 'bg-slate-900/40'}">
+                                <button onclick="toggleSet(${exIdx}, ${sIdx})" class="btn-action w-10 h-10 rounded-xl flex items-center justify-center ${s.done ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-500'}">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                </button>
+                                <span class="w-6 text-[10px] font-black text-slate-600">S${sIdx+1}</span>
+                                <div class="flex-1 grid grid-cols-2 gap-4">
+                                    <div class="relative">
+                                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-600">KG</span>
+                                        <input type="number" placeholder="0" value="${s.weight}" oninput="updateSetData(${exIdx}, ${sIdx}, 'weight', this.value)" class="w-full bg-slate-950 border border-white/5 px-4 py-3 rounded-xl text-sm font-black outline-none focus:border-indigo-500 transition-colors">
+                                    </div>
+                                    <div class="relative">
+                                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-600">REPS</span>
+                                        <input type="number" placeholder="0" value="${s.reps}" oninput="updateSetData(${exIdx}, ${sIdx}, 'reps', this.value)" class="w-full bg-slate-950 border border-white/5 px-4 py-3 rounded-xl text-sm font-black outline-none focus:border-indigo-500 transition-colors">
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        window.toggleSet = (eIdx, sIdx) => {
+            const isDone = activeSession[eIdx].actual[sIdx].done;
+            activeSession[eIdx].actual[sIdx].done = !isDone;
+            
+            if (!isDone) {
+                startRestTimer(90); // 90 segundos de descanso por defecto
+            }
+            
+            renderActiveSession();
+            updateProgressBar();
+        };
+
+        window.updateSetData = (eIdx, sIdx, k, v) => { activeSession[eIdx].actual[sIdx][k] = v; };
+
+        const updateProgressBar = () => {
+            const allSets = activeSession.flatMap(ex => ex.actual);
+            const completed = allSets.filter(s => s.done).length;
+            const percentage = Math.round((completed / allSets.length) * 100) || 0;
+            
+            document.getElementById('session-progress').style.width = `${percentage}%`;
+            document.getElementById('progress-text').textContent = `${percentage}% completado`;
+        };
+
+        // TIMER
+        const startRestTimer = (seconds) => {
+            clearInterval(timerInterval);
+            const display = document.getElementById('rest-timer-display');
+            const secondsEl = document.getElementById('timer-seconds');
+            display.classList.remove('hidden');
+            
+            let remaining = seconds;
+            timerInterval = setInterval(() => {
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                secondsEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    display.classList.add('hidden');
+                    showToast("¡Descanso terminado! Dale.");
+                }
+                remaining--;
+            }, 1000);
+        };
+
+        // PERSISTENCIA & FIREBASE
+        window.saveFullSession = async () => {
+            if (!user || !activeSession) return;
+            const date = document.getElementById('workout-date').value;
+            
+            const entries = activeSession.map(ex => ({
+                exercise: ex.name,
+                category: ex.cat,
+                sets: ex.actual.filter(s => s.done).map(s => ({
+                    weight: parseFloat(s.weight) || 0,
+                    reps: parseInt(s.reps) || 0
+                }))
+            })).filter(ex => ex.sets.length > 0);
+
+            if (entries.length === 0) return showToast("Marca series como completadas");
+
+            try {
+                for (const entry of entries) {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
+                        ...entry,
+                        date,
+                        timestamp: serverTimestamp()
+                    });
+                }
+                showToast("Entrenamiento guardado en la nube");
+                activeSession = null;
+                document.getElementById('session-actions').classList.add('hidden');
+                document.getElementById('active-session-container').innerHTML = `<div class="p-16 text-center rounded-[3rem] border-dashed border-2 border-white/10"><h3 class="text-xl font-black text-white mb-2">¡Misión Cumplida!</h3><p class="text-slate-500 text-sm">Tus ganancias han sido sincronizadas.</p></div>`;
+            } catch (err) {
+                console.error(err);
+                showToast("Error al guardar");
+            }
+        };
+
+        const renderHistory = (logs) => {
+            const container = document.getElementById('workout-history');
+            const volStat = document.getElementById('stat-volume');
+            const setsStat = document.getElementById('stat-sets');
+            const ptsStat = document.getElementById('stat-points');
+            const streakStat = document.getElementById('streak-count');
+
+            if (logs.length === 0) {
+                container.innerHTML = `<p class="col-span-full text-center text-slate-700 font-bold py-10">Sin actividad previa.</p>`;
+                return;
+            }
+
+            // Calculamos estadísticas básicas
+            let totalVolume = 0;
+            let totalSets = 0;
+            const uniqueDays = new Set();
+
+            logs.forEach(l => {
+                totalSets += l.sets.length;
+                l.sets.forEach(s => totalVolume += (s.weight * s.reps));
+                uniqueDays.add(l.date);
+            });
+
+            volStat.innerHTML = `${Math.round(totalVolume)} <span class="text-sm text-slate-500">kg</span>`;
+            setsStat.innerHTML = `${totalSets} <span class="text-sm text-slate-500">sets</span>`;
+            ptsStat.innerHTML = `${Math.round(totalVolume / 100)} <span class="text-sm text-slate-500">pts</span>`;
+            streakStat.textContent = `🔥 ${uniqueDays.size} Días`;
+
+            // Agrupar por fecha para el feed
+            const grouped = logs.reduce((acc, log) => {
+                if (!acc[log.date]) acc[log.date] = [];
+                acc[log.date].push(log);
+                return acc;
+            }, {});
+
+            container.innerHTML = Object.entries(grouped).slice(0, 6).map(([date, items]) => `
+                <div class="glass-panel p-5 rounded-[2rem] space-y-4">
+                    <div class="flex justify-between items-center border-b border-white/5 pb-3">
+                        <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">${date}</span>
+                        <span class="text-[9px] font-bold text-slate-500">${items.length} ej.</span>
+                    </div>
+                    <div class="space-y-3">
+                        ${items.map(it => `
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <h5 class="font-bold text-xs text-slate-200">${it.exercise}</h5>
+                                    <button onclick="deleteEntry('${it.id}')" class="text-slate-700 hover:text-rose-500"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="3" stroke-linecap="round"/></svg></button>
+                                </div>
+                                <div class="flex flex-wrap gap-1">
+                                    ${it.sets.map(s => `<span class="bg-indigo-500/5 border border-indigo-500/10 px-2 py-0.5 rounded-md text-[8px] font-black text-indigo-300">${s.weight}k x ${s.reps}</span>`).join('')}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        window.deleteEntry = async (id) => { if(confirm("¿Borrar registro?")) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'history', id)); };
+
+        const showToast = (msg) => {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.remove('opacity-0', 'translate-y-10');
+            setTimeout(() => t.classList.add('opacity-0', 'translate-y-10'), 3000);
+        };
+
+        // INIT
+        window.onload = async () => {
+            document.getElementById('workout-date').value = new Date().toISOString().split('T')[0];
+            renderLibrary();
+            updatePlanUI();
+
+            try {
+                await signInAnonymously(auth);
+            } catch (e) { console.error("Auth", e); }
+
+            onAuthStateChanged(auth, u => {
+                if (u) {
+                    user = u;
+                    const qH = query(collection(db, 'artifacts', appId, 'users', user.uid, 'history'));
+                    onSnapshot(qH, snap => {
+                        const logs = [];
+                        snap.forEach(d => logs.push({ id: d.id, ...d.data() }));
+                        logs.sort((a,b) => b.timestamp - a.timestamp);
+                        renderHistory(logs);
+                    }, err => console.error("Snapshot", err));
+                }
+            });
+        };
+
+        document.getElementById('lib-search').addEventListener('input', e => renderLibrary(e.target.value));
         
-        container.innerHTML = list.map(w => `
-            <div class="workout-card">
-                <strong>${w.exercise}</strong>
-                <p style="font-size: 0.9em; color: var(--primary)">${w.sets}x${w.reps} - ${w.weight}kg</p>
-                <small style="color: #666">${new Date(w.date).toLocaleDateString()}</small>
-            </div>
-        `).join('');
-    }
-
-    function switchTab(tabId) {
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.getElementById(tabId + 'Section').classList.add('active');
-        event.target.classList.add('active');
-    }
-
-    // Al cargar, verificar si hay sesión activa
-    if (currentUser) login(currentUser);
-</script>
-
+        // Exponer funciones globales
+        window.addToPlan = addToPlan;
+        window.removePlanItem = removePlanItem;
+        window.updatePlanItem = updatePlanItem;
+        window.clearRoutine = clearRoutine;
+        window.startRoutine = startRoutine;
+        window.toggleSet = toggleSet;
+        window.updateSetData = updateSetData;
+        window.saveFullSession = saveFullSession;
+        window.deleteEntry = deleteEntry;
+    </script>
 </body>
 </html>
