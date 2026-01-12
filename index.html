@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gym OS Pro 2026 - Ultimate Edition</title>
+    <title>Gym OS Pro 2026 - Ultimate Performance</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -11,39 +11,36 @@
         body { background-color: var(--bg-dark); font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; }
         .glass-panel { background: var(--glass); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
         .nav-tab.active { color: white; position: relative; }
-        .nav-tab.active::after { content: ''; position: absolute; bottom: 0; left: 25%; width: 50%; height: 3px; background: var(--brand-primary); border-radius: 10px; shadow: 0 0 15px var(--brand-primary); }
+        .nav-tab.active::after { content: ''; position: absolute; bottom: 0; left: 25%; width: 50%; height: 3px; background: var(--brand-primary); border-radius: 10px; box-shadow: 0 0 15px var(--brand-primary); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         input[type="number"]::-webkit-inner-spin-button { display: none; }
+        .bar-transition { transition: height 1s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
 <body class="min-h-screen pb-32">
 
     <div id="login-overlay" class="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center px-6">
-        <div class="glass-panel p-8 rounded-[2.5rem] w-full max-w-md border border-white/10 shadow-2xl">
-            <div class="text-center mb-8">
-                <div class="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-indigo-500/30">
-                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                </div>
-                <h2 class="text-2xl font-black text-white tracking-tighter">GYMOS PRO</h2>
-                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-2">Introduce tus datos para acceder</p>
+        <div class="glass-panel p-8 rounded-[2.5rem] w-full max-w-md border border-white/10 shadow-2xl text-center">
+            <div class="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-500/30">
+                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
             </div>
+            <h2 class="text-3xl font-black text-white tracking-tighter mb-2">GYMOS PRO</h2>
+            <p class="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-8">Performance & Analytics</p>
             <div class="space-y-4">
-                <input type="email" id="login-email" placeholder="Email" class="w-full bg-slate-900 border border-white/5 px-6 py-4 rounded-2xl text-white outline-none focus:border-indigo-500">
-                <input type="password" id="login-pass" placeholder="Contraseña" class="w-full bg-slate-900 border border-white/5 px-6 py-4 rounded-2xl text-white outline-none focus:border-indigo-500">
-                <button onclick="window.ejecutarLogin()" class="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-indigo-600/30">ENTRAR / REGISTRARSE</button>
+                <input type="email" id="login-email" placeholder="Correo Electrónico" class="w-full bg-slate-900 border border-white/5 px-6 py-4 rounded-2xl text-white outline-none focus:border-indigo-500 transition-all">
+                <input type="password" id="login-pass" placeholder="Contraseña" class="w-full bg-slate-900 border border-white/5 px-6 py-4 rounded-2xl text-white outline-none focus:border-indigo-500 transition-all">
+                <button onclick="window.ejecutarLogin()" class="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-indigo-600/30">ENTRAR O REGISTRARSE</button>
             </div>
         </div>
     </div>
 
     <nav class="sticky top-0 z-50 glass-panel border-b border-white/5 mb-8">
         <div class="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <h1 class="font-black text-lg">GYMOS <span class="text-indigo-500">PRO</span></h1>
-            </div>
+            <h1 class="font-black text-xl tracking-tighter">GYMOS <span class="text-indigo-500">PRO</span></h1>
             <div class="flex items-center gap-4">
                 <div id="rest-timer-display" class="hidden bg-slate-900 border border-rose-500/30 px-4 py-2 rounded-xl flex items-center gap-3">
                     <span class="w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
-                    <span id="timer-seconds" class="font-mono font-bold text-rose-400 text-sm">01:30</span>
+                    <span id="timer-seconds" class="font-mono font-bold text-rose-400 text-sm">00:00</span>
                 </div>
                 <button onclick="window.cerrarSesion()" class="text-[10px] font-black bg-rose-500/10 text-rose-500 px-4 py-2 rounded-xl border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all">LOGOUT ✕</button>
             </div>
@@ -56,66 +53,102 @@
     </nav>
 
     <main class="max-w-6xl mx-auto px-6">
-        <section id="section-dashboard" class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="glass-panel p-6 rounded-3xl"><p class="text-[10px] font-black text-slate-500 uppercase">Volumen</p><h3 id="stat-volume" class="text-2xl font-black">0 kg</h3></div>
-                <div class="glass-panel p-6 rounded-3xl"><p class="text-[10px] font-black text-slate-500 uppercase">Series</p><h3 id="stat-sets" class="text-2xl font-black">0</h3></div>
-                <div class="glass-panel p-6 rounded-3xl"><p class="text-[10px] font-black text-slate-500 uppercase">Racha</p><h3 id="streak-count" class="text-2xl font-black">🔥 0 Días</h3></div>
+        
+        <section id="section-dashboard" class="space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-panel p-6 rounded-[2rem] border-l-4 border-indigo-500">
+                    <p class="text-[10px] font-black text-slate-500 uppercase mb-1">Volumen Total</p>
+                    <h3 id="stat-volume" class="text-3xl font-black text-white">0 <span class="text-sm text-slate-500">kg</span></h3>
+                </div>
+                <div class="glass-panel p-6 rounded-[2rem] border-l-4 border-emerald-500">
+                    <p class="text-[10px] font-black text-slate-500 uppercase mb-1">Series Totales</p>
+                    <h3 id="stat-sets" class="text-3xl font-black text-white">0</h3>
+                </div>
+                <div class="glass-panel p-6 rounded-[2rem] border-l-4 border-amber-500">
+                    <p class="text-[10px] font-black text-slate-500 uppercase mb-1">Constancia</p>
+                    <h3 id="streak-count" class="text-3xl font-black text-white">🔥 0 <span class="text-sm text-slate-500">Días</span></h3>
+                </div>
             </div>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="glass-panel p-6 rounded-[2.5rem]">
-        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Volumen últimos 7 días</h4>
-        <div id="volume-chart" class="flex items-end justify-between h-32 gap-2 px-2">
-            </div>
-    </div>
 
-    <div class="glass-panel p-6 rounded-[2.5rem]">
-        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Calculadora 1RM (Brzycki)</h4>
-        <div class="grid grid-cols-2 gap-4">
-            <input type="number" id="rm-weight" placeholder="KG" class="bg-slate-900 border border-white/5 p-4 rounded-2xl text-sm outline-none focus:border-indigo-500">
-            <input type="number" id="rm-reps" placeholder="REPS" class="bg-slate-900 border border-white/5 p-4 rounded-2xl text-sm outline-none focus:border-indigo-500">
-        </div>
-        <div class="mt-4 p-4 bg-indigo-600/10 rounded-2xl border border-indigo-500/20 text-center">
-            <p class="text-[10px] font-black text-indigo-400 uppercase">Tu Máximo Estimado</p>
-            <h3 id="rm-result" class="text-2xl font-black text-white">0 <span class="text-sm">kg</span></h3>
-        </div>
-    </div>
-</div>
-            <div id="workout-history" class="grid gap-3"></div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="glass-panel p-8 rounded-[2.5rem]">
+                    <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-8">Volumen Semanal (7d)</h4>
+                    <div id="volume-chart" class="flex items-end justify-between h-40 gap-3 px-2">
+                        </div>
+                </div>
+
+                <div class="glass-panel p-8 rounded-[2.5rem]">
+                    <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6 text-center">Calculadora de Fuerza Máxima (1RM)</h4>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-500 ml-2 uppercase">Peso (kg)</label>
+                            <input type="number" id="rm-weight" placeholder="0" class="w-full bg-slate-900 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none focus:border-indigo-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-500 ml-2 uppercase">Reps</label>
+                            <input type="number" id="rm-reps" placeholder="0" class="w-full bg-slate-900 border border-white/5 p-4 rounded-2xl text-white font-bold outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+                    <div class="p-6 bg-indigo-600/10 rounded-[2rem] border border-indigo-500/20 text-center">
+                        <p class="text-[10px] font-black text-indigo-400 uppercase mb-1">1RM Estimado</p>
+                        <h3 id="rm-result" class="text-4xl font-black text-white">0 <span class="text-sm font-medium">kg</span></h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <h3 class="text-xl font-black px-2">Historial Reciente</h3>
+                <div id="workout-history" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
         </section>
 
         <section id="section-train" class="hidden space-y-6">
-            <div class="glass-panel p-6 rounded-3xl flex justify-between items-center">
-                <h2 class="text-xl font-black">Entrenamiento Activo</h2>
-                <input type="date" id="workout-date" class="bg-transparent text-indigo-400 font-bold outline-none text-sm">
+            <div class="glass-panel p-8 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-black text-white">Sesión Activa</h2>
+                    <p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Registra tus marcas actuales</p>
+                </div>
+                <input type="date" id="workout-date" class="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold px-6 py-3 rounded-2xl outline-none">
             </div>
-            <div id="active-session-container" class="space-y-4"></div>
-            <div id="session-actions" class="hidden">
-                <button onclick="window.saveFullSession()" class="w-full py-6 bg-indigo-600 rounded-[2rem] font-black text-lg shadow-xl shadow-indigo-600/30">FINALIZAR Y GUARDAR</button>
+            
+            <div id="active-session-container" class="space-y-6">
+                </div>
+
+            <div id="session-actions" class="hidden pb-12">
+                <button onclick="window.saveFullSession()" class="w-full py-6 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xl rounded-[2rem] shadow-2xl shadow-indigo-600/40 transition-all transform hover:-translate-y-1 active:scale-95">FINALIZAR ENTRENAMIENTO</button>
             </div>
         </section>
 
-        <section id="section-routines" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="glass-panel p-6 rounded-[2.5rem]">
-                <h3 class="font-black mb-4">Ejercicios</h3>
-                <input type="text" id="lib-search" placeholder="Filtrar..." class="w-full bg-slate-900 p-4 rounded-xl mb-4 border border-white/5 outline-none">
-                <div id="library-list" class="h-96 overflow-y-auto no-scrollbar space-y-4"></div>
+        <section id="section-routines" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div class="lg:col-span-5">
+                <div class="glass-panel p-8 rounded-[2.5rem] sticky top-28">
+                    <h3 class="text-xl font-black mb-6">Librería de Ejercicios</h3>
+                    <input type="text" id="lib-search" placeholder="Buscar ejercicio..." class="w-full bg-slate-900 border border-white/5 px-6 py-4 rounded-2xl text-sm mb-6 outline-none focus:border-indigo-500">
+                    <div id="library-list" class="h-96 overflow-y-auto no-scrollbar space-y-4 px-1"></div>
+                </div>
             </div>
-            <div class="glass-panel p-6 rounded-[2.5rem]">
-                <div class="flex justify-between items-center mb-6"><h3 class="font-black">Mi Plan</h3><button onclick="window.clearRoutine()" class="text-xs text-rose-500 font-black">VACIAR</button></div>
-                <div id="routine-config-list" class="space-y-3 mb-6"></div>
-                <button onclick="window.startRoutine()" id="start-btn" class="hidden w-full py-5 bg-white text-slate-950 font-black rounded-2xl">EMPEZAR RUTINA AHORA</button>
+            <div class="lg:col-span-7">
+                <div class="glass-panel p-8 rounded-[2.5rem]">
+                    <div class="flex justify-between items-center mb-8">
+                        <h3 class="text-2xl font-black text-white">Mi Rutina Hoy</h3>
+                        <button onclick="window.clearRoutine()" class="text-[10px] font-black text-rose-500 bg-rose-500/10 px-4 py-2 rounded-xl">VACIAR</button>
+                    </div>
+                    <div id="routine-config-list" class="space-y-4 mb-8"></div>
+                    <button onclick="window.startRoutine()" id="start-btn" class="hidden w-full py-5 bg-white text-slate-950 font-black rounded-2xl hover:bg-slate-200 transition-all text-lg">EMPEZAR AHORA</button>
+                </div>
             </div>
         </section>
+
     </main>
 
-    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 glass-panel border-indigo-500 px-6 py-3 rounded-xl opacity-0 transition-all z-[200] text-[10px] font-black uppercase text-white"></div>
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 glass-panel border-indigo-500/50 px-8 py-4 rounded-2xl opacity-0 transition-all duration-500 z-[200] font-black text-[10px] uppercase tracking-widest text-white shadow-2xl pointer-events-none"></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- FIREBASE CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyB5TTnMn1co3GA_oX3jrZ5KZ8KzRbXbhGQ",
             authDomain: "gym-pro-4588d.firebaseapp.com",
@@ -126,31 +159,36 @@
         };
 
         const EXERCISES = {
-            "Empuje": ["Press Banca", "Press Militar", "Aperturas", "Elev. Laterales"],
-            "Tracción": ["Dominadas", "Remo Barra", "Jalón Pecho", "Curl Bíceps"],
-            "Pierna": ["Sentadilla", "Prensa 45°", "Ext. Cuádriceps", "Gemelos"]
+            "Empuje (Pecho/Hombro/Triceps)": ["Press de Banca", "Press Inclinado", "Aperturas", "Press Militar", "Elevaciones Laterales", "Extensiones Tríceps", "Fondos"],
+            "Tracción (Espalda/Biceps)": ["Dominadas", "Remo con Barra", "Jalón al Pecho", "Remo en Polea", "Curl de Bíceps Barra", "Martillo", "Facepulls"],
+            "Pierna (Quad/Femo/Glúteo)": ["Sentadillas", "Prensa 45°", "Peso Muerto Rumano", "Extensiones Cuádriceps", "Curl Femoral", "Zancadas", "Gemelos"],
+            "Core": ["Plancha", "Rueda Abdominal", "Leg Raises", "Crunch con Cable"]
         };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = 'gym-os-2026-v1';
+        const appId = 'gym-os-2026-ultimate';
 
         let user = null;
         let myPlannedRoutine = JSON.parse(localStorage.getItem('planned_routine_v2') || '[]');
         let activeSession = null;
         let timerInterval = null;
 
-        // AUTH LOGIC
+        // --- AUTH & LOGIN ---
         window.ejecutarLogin = async () => {
             const email = document.getElementById('login-email').value;
             const pass = document.getElementById('login-pass').value;
-            if(!email || !pass) return window.showToast("Rellena los campos");
+            if(!email || !pass) return window.showToast("Introduce email y contraseña");
             try {
                 await signInWithEmailAndPassword(auth, email, pass);
+                window.showToast("Sesión iniciada");
             } catch (e) {
                 if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
-                    await createUserWithEmailAndPassword(auth, email, pass);
+                    try {
+                        await createUserWithEmailAndPassword(auth, email, pass);
+                        window.showToast("Cuenta creada con éxito");
+                    } catch (err) { window.showToast(err.message); }
                 } else { window.showToast(e.message); }
             }
         };
@@ -161,14 +199,13 @@
             const overlay = document.getElementById('login-overlay');
             if (u) {
                 user = u; overlay.classList.add('hidden');
-                cargarHistorial();
+                initDataSync();
             } else {
                 user = null; overlay.classList.remove('hidden');
-                document.getElementById('workout-history').innerHTML = "";
             }
         });
 
-        // TABS & UI
+        // --- NAVEGACIÓN ---
         window.switchTab = (tab) => {
             ['dashboard', 'train', 'routines'].forEach(t => {
                 document.getElementById(`section-${t}`).classList.toggle('hidden', t !== tab);
@@ -176,6 +213,7 @@
             });
         };
 
+        // --- GESTIÓN DE RUTINAS ---
         const renderLibrary = (filter = "") => {
             const list = document.getElementById('library-list');
             list.innerHTML = "";
@@ -183,17 +221,18 @@
                 const filtered = exs.filter(e => e.toLowerCase().includes(filter.toLowerCase()));
                 if (filtered.length === 0) return;
                 const div = document.createElement('div');
-                div.innerHTML = `<p class="text-[9px] font-black text-slate-600 uppercase mb-2 mt-4">${cat}</p>
+                div.innerHTML = `<p class="text-[9px] font-black text-slate-600 uppercase mb-3 mt-4 ml-1">${cat}</p>
                     <div class="grid gap-2">${filtered.map(ex => `
-                        <button onclick="window.addToPlan('${ex}', '${cat}')" class="w-full text-left bg-white/5 p-4 rounded-xl text-xs hover:border-indigo-500 border border-transparent flex justify-between">
-                            ${ex} <span class="text-indigo-500 font-black">+</span>
+                        <button onclick="window.addToPlan('${ex}', '${cat}')" class="w-full text-left bg-white/5 p-4 rounded-xl text-xs hover:border-indigo-500 border border-transparent flex justify-between group transition-all">
+                            <span class="text-white font-medium">${ex}</span>
+                            <span class="text-indigo-500 font-black group-hover:scale-125 transition-transform">+</span>
                         </button>`).join('')}</div>`;
                 list.appendChild(div);
             });
         };
 
         window.addToPlan = (name, cat) => {
-            if (myPlannedRoutine.some(p => p.name === name)) return;
+            if (myPlannedRoutine.some(p => p.name === name)) return window.showToast("Ya está en tu plan");
             myPlannedRoutine.push({ name, cat, sets: 3, reps: 10 });
             window.updatePlanUI();
         };
@@ -203,16 +242,22 @@
             const list = document.getElementById('routine-config-list');
             const btn = document.getElementById('start-btn');
             if (myPlannedRoutine.length === 0) {
-                list.innerHTML = `<p class="text-slate-600 text-xs italic">Añade ejercicios...</p>`;
+                list.innerHTML = `<div class="p-12 text-center text-slate-600 text-sm font-bold italic border-2 border-dashed border-white/5 rounded-3xl">Librería vacía. Añade ejercicios para empezar.</div>`;
                 btn.classList.add('hidden');
             } else {
                 btn.classList.remove('hidden');
                 list.innerHTML = myPlannedRoutine.map((it, idx) => `
-                    <div class="bg-white/5 p-4 rounded-xl flex items-center justify-between">
-                        <span class="font-bold text-sm">${it.name}</span>
-                        <div class="flex items-center gap-3">
-                            <input type="number" value="${it.sets}" onchange="window.updatePlanItem(${idx}, 'sets', this.value)" class="w-8 bg-transparent text-indigo-400 font-bold text-center outline-none">
-                            <button onclick="window.removePlanItem(${idx})" class="text-rose-500 font-black">✕</button>
+                    <div class="bg-white/5 p-5 rounded-2xl flex items-center justify-between border border-white/5">
+                        <div class="flex flex-col">
+                            <span class="font-black text-sm text-white">${it.name}</span>
+                            <span class="text-[8px] font-black text-slate-500 uppercase">${it.cat}</span>
+                        </div>
+                        <div class="flex items-center gap-6">
+                            <div class="flex flex-col items-center">
+                                <span class="text-[8px] font-black text-indigo-400 mb-1">SETS</span>
+                                <input type="number" value="${it.sets}" onchange="window.updatePlanItem(${idx}, 'sets', this.value)" class="w-8 bg-transparent text-white font-black text-center outline-none">
+                            </div>
+                            <button onclick="window.removePlanItem(${idx})" class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 font-black">✕</button>
                         </div>
                     </div>`).join('');
             }
@@ -220,10 +265,11 @@
 
         window.updatePlanItem = (i, k, v) => { myPlannedRoutine[i][k] = parseInt(v) || 1; localStorage.setItem('planned_routine_v2', JSON.stringify(myPlannedRoutine)); };
         window.removePlanItem = (i) => { myPlannedRoutine.splice(i, 1); window.updatePlanUI(); };
-        window.clearRoutine = () => { if(confirm("¿Vaciar?")) { myPlannedRoutine = []; window.updatePlanUI(); }};
+        window.clearRoutine = () => { if(confirm("¿Borrar todo el plan?")) { myPlannedRoutine = []; window.updatePlanUI(); }};
 
-        // WORKOUT LOGIC
+        // --- LÓGICA DE ENTRENAMIENTO ---
         window.startRoutine = () => {
+            if (myPlannedRoutine.length === 0) return;
             activeSession = myPlannedRoutine.map(ex => ({
                 ...ex,
                 actual: Array.from({ length: ex.sets }, () => ({ weight: "", reps: ex.reps, done: false }))
@@ -231,26 +277,43 @@
             window.renderActiveSession();
             window.switchTab('train');
             document.getElementById('session-actions').classList.remove('hidden');
+            window.showToast("Rutina Iniciada");
         };
 
         window.renderActiveSession = () => {
             const container = document.getElementById('active-session-container');
             container.innerHTML = activeSession.map((ex, exIdx) => `
-                <div class="glass-panel p-5 rounded-3xl space-y-3">
-                    <div class="flex justify-between items-center"><h4 class="font-black text-sm">${ex.name}</h4></div>
-                    ${ex.actual.map((s, sIdx) => `
-                        <div class="flex items-center gap-3 p-2 rounded-xl ${s.done ? 'bg-emerald-500/10' : 'bg-slate-900'}">
-                            <button onclick="window.toggleSet(${exIdx}, ${sIdx})" class="w-8 h-8 rounded-lg ${s.done ? 'bg-emerald-500' : 'bg-slate-700'}">${s.done ? '✓' : sIdx+1}</button>
-                            <input type="number" placeholder="KG" value="${s.weight}" oninput="window.updateSetData(${exIdx}, ${sIdx}, 'weight', this.value)" class="w-full bg-transparent text-center font-bold outline-none">
-                            <input type="number" placeholder="REPS" value="${s.reps}" oninput="window.updateSetData(${exIdx}, ${sIdx}, 'reps', this.value)" class="w-full bg-transparent text-center font-bold outline-none">
-                        </div>`).join('')}
+                <div class="glass-panel p-6 rounded-[2.5rem] space-y-4 border border-white/5">
+                    <div class="flex justify-between items-center px-2">
+                        <h4 class="font-black text-lg text-white">${ex.name}</h4>
+                        <span class="text-[9px] font-black bg-indigo-500/10 text-indigo-500 px-3 py-1 rounded-full uppercase">${ex.cat}</span>
+                    </div>
+                    <div class="space-y-2">
+                        ${ex.actual.map((s, sIdx) => `
+                            <div class="flex items-center gap-3 p-3 rounded-2xl transition-all ${s.done ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-slate-900/50 border border-white/5'}">
+                                <button onclick="window.toggleSet(${exIdx}, ${sIdx})" class="w-10 h-10 rounded-xl font-black text-xs transition-all ${s.done ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}">
+                                    ${s.done ? '✓' : sIdx + 1}
+                                </button>
+                                <div class="flex-1 grid grid-cols-2 gap-4">
+                                    <div class="relative">
+                                        <input type="number" placeholder="KG" value="${s.weight}" oninput="window.updateSetData(${exIdx}, ${sIdx}, 'weight', this.value)" class="w-full bg-slate-950/50 p-3 rounded-xl text-center font-black outline-none focus:ring-1 ring-indigo-500">
+                                    </div>
+                                    <div class="relative">
+                                        <input type="number" placeholder="REPS" value="${s.reps}" oninput="window.updateSetData(${exIdx}, ${sIdx}, 'reps', this.value)" class="w-full bg-slate-950/50 p-3 rounded-xl text-center font-black outline-none focus:ring-1 ring-indigo-500">
+                                    </div>
+                                </div>
+                            </div>`).join('')}
+                    </div>
                 </div>`).join('');
         };
 
         window.toggleSet = (ei, si) => {
             const current = activeSession[ei].actual[si].done;
             activeSession[ei].actual[si].done = !current;
-            if(!current) window.startRestTimer(90);
+            if(!current) {
+                const secs = prompt("Segundos de descanso:", "90") || "90";
+                window.startRestTimer(parseInt(secs));
+            }
             window.renderActiveSession();
         };
 
@@ -259,56 +322,124 @@
         window.startRestTimer = (sec) => {
             clearInterval(timerInterval);
             const disp = document.getElementById('rest-timer-display');
+            const secEl = document.getElementById('timer-seconds');
             disp.classList.remove('hidden');
             let r = sec;
             timerInterval = setInterval(() => {
-                document.getElementById('timer-seconds').textContent = `00:${r.toString().padStart(2,'0')}`;
-                if(r-- <= 0) { clearInterval(timerInterval); disp.classList.add('hidden'); }
+                const mins = Math.floor(r / 60);
+                const s = r % 60;
+                secEl.textContent = `${mins.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                if(r-- <= 0) { 
+                    clearInterval(timerInterval); 
+                    disp.classList.add('hidden');
+                    window.showToast("¡Descanso terminado!");
+                }
             }, 1000);
         };
 
         window.saveFullSession = async () => {
-            if(!user) return;
+            if(!user || !activeSession) return;
             const entries = activeSession.map(ex => ({
                 exercise: ex.name,
                 sets: ex.actual.filter(s => s.done).map(s => ({ weight: parseFloat(s.weight)||0, reps: parseInt(s.reps)||0 })),
                 date: document.getElementById('workout-date').value
             })).filter(e => e.sets.length > 0);
 
-            for(const e of entries) {
-                await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), { ...e, timestamp: serverTimestamp() });
-            }
-            window.showToast("ENTRENAMIENTO GUARDADO");
-            activeSession = null;
-            window.switchTab('dashboard');
+            if(entries.length === 0) return window.showToast("No has marcado ninguna serie");
+
+            try {
+                for(const e of entries) {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), { ...e, timestamp: serverTimestamp() });
+                }
+                window.showToast("¡ENTRENAMIENTO GUARDADO!");
+                activeSession = null;
+                document.getElementById('active-session-container').innerHTML = "";
+                document.getElementById('session-actions').classList.add('hidden');
+                window.switchTab('dashboard');
+            } catch(err) { window.showToast("Error al guardar en la nube"); }
         };
 
-        const cargarHistorial = () => {
-            const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'history'));
+        // --- DASHBOARD: ANALYTICS & HISTORY ---
+        const initDataSync = () => {
+            const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), orderBy('timestamp', 'desc'));
             onSnapshot(q, snap => {
                 const logs = []; snap.forEach(d => logs.push(d.data()));
-                renderHistoryStats(logs.sort((a,b) => b.timestamp - a.timestamp));
+                renderDashboard(logs);
             });
         };
 
-        const renderHistoryStats = (logs) => {
-            let v = 0, s = 0; const d = new Set();
-            logs.forEach(l => {
-                s += l.sets.length;
-                l.sets.forEach(set => v += (set.weight * set.reps));
-                d.add(l.date);
-            });
-            document.getElementById('stat-volume').textContent = Math.round(v) + " kg";
-            document.getElementById('stat-sets').textContent = s;
-            document.getElementById('streak-count').textContent = `🔥 ${d.size} Días`;
+        const renderDashboard = (logs) => {
+            let totalVol = 0, totalSets = 0; 
+            const uniqueDays = new Set();
             
-            document.getElementById('workout-history').innerHTML = logs.slice(0, 5).map(l => `
-                <div class="glass-panel p-4 rounded-2xl flex justify-between items-center">
-                    <div><p class="text-xs font-black">${l.exercise}</p><p class="text-[9px] text-slate-500 uppercase">${l.date}</p></div>
-                    <p class="text-xs font-bold text-indigo-400">${l.sets.length} sets</p>
+            logs.forEach(l => {
+                totalSets += l.sets.length;
+                l.sets.forEach(s => totalVol += (s.weight * s.reps));
+                uniqueDays.add(l.date);
+            });
+
+            document.getElementById('stat-volume').innerHTML = `${Math.round(totalVol).toLocaleString()} <span class="text-sm">kg</span>`;
+            document.getElementById('stat-sets').textContent = totalSets;
+            document.getElementById('streak-count').innerHTML = `🔥 ${uniqueDays.size} <span class="text-sm">Días</span>`;
+            
+            // Gráfico
+            renderVolumeChart(logs);
+            
+            // Historial
+            document.getElementById('workout-history').innerHTML = logs.slice(0, 6).map(l => `
+                <div class="glass-panel p-5 rounded-2xl flex justify-between items-center border border-white/5 transition-all hover:bg-white/[0.03]">
+                    <div>
+                        <p class="text-sm font-black text-white">${l.exercise}</p>
+                        <p class="text-[9px] text-slate-500 uppercase font-bold">${l.date}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs font-black text-indigo-400">${l.sets.length} SETS</p>
+                        <p class="text-[9px] text-slate-600 font-bold">${Math.round(l.sets.reduce((a,b)=>a+(b.weight*b.reps),0))} KG VOL</p>
+                    </div>
                 </div>`).join('');
         };
 
+        const renderVolumeChart = (logs) => {
+            const chart = document.getElementById('volume-chart');
+            const last7Days = [...Array(7)].map((_, i) => {
+                const d = new Date(); d.setDate(d.getDate() - i);
+                return d.toISOString().split('T')[0];
+            }).reverse();
+
+            const dailyVolume = last7Days.map(day => {
+                return logs.filter(l => l.date === day)
+                           .reduce((sum, l) => sum + l.sets.reduce((s, set) => s + (set.weight * set.reps), 0), 0);
+            });
+
+            const max = Math.max(...dailyVolume, 100);
+
+            chart.innerHTML = dailyVolume.map((v, i) => `
+                <div class="flex-1 flex flex-col items-center gap-3 group">
+                    <div class="w-full bg-indigo-600/20 rounded-xl relative flex items-end h-full overflow-hidden">
+                        <div class="w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-xl bar-transition group-hover:from-indigo-400 group-hover:to-indigo-300" 
+                             style="height: ${(v/max)*100}%"></div>
+                        <span class="absolute -top-7 left-1/2 -translate-x-1/2 text-[8px] font-black text-white opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-600 px-2 py-1 rounded shadow-lg">
+                            ${Math.round(v)}
+                        </span>
+                    </div>
+                    <span class="text-[8px] font-black text-slate-600 uppercase">${last7Days[i].split('-')[2]}</span>
+                </div>`).join('');
+        };
+
+        // --- CALCULADORA 1RM ---
+        const updateRM = () => {
+            const w = parseFloat(document.getElementById('rm-weight').value);
+            const r = parseFloat(document.getElementById('rm-reps').value);
+            const res = document.getElementById('rm-result');
+            if (w && r) {
+                const rm = w / (1.0278 - (0.0278 * r)); // Brzycki
+                res.innerHTML = `${Math.round(rm)} <span class="text-sm font-medium italic">kg</span>`;
+            } else { res.innerHTML = `0 <span class="text-sm font-medium">kg</span>`; }
+        };
+        document.getElementById('rm-weight').addEventListener('input', updateRM);
+        document.getElementById('rm-reps').addEventListener('input', updateRM);
+
+        // --- UTILS ---
         window.showToast = (m) => {
             const t = document.getElementById('toast');
             t.textContent = m; t.classList.remove('opacity-0');
