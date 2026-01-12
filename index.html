@@ -2,35 +2,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>GYMTRACK ULTRA | Elite Performance</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GymTrack Pro - GitHub Pages</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, setDoc, doc, onSnapshot, Timestamp, query, limit, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        window.FirebaseSDK = { initializeApp, getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, signOut, getFirestore, collection, addDoc, setDoc, doc, onSnapshot, Timestamp, query, limit, where, getDocs, orderBy };
-    </script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #050505; color: white; -webkit-tap-highlight-color: transparent; }
-        .font-pro { font-family: 'Orbitron', sans-serif; }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .glass { background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(163, 230, 53, 0.1); }
-    </style>
 </head>
-<body>
+<body class="bg-[#050505] text-zinc-100 font-sans selection:bg-lime-400 selection:text-black">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
-        const { Zap, LayoutDashboard, Settings, Plus, CheckCircle2, Flame, History, TrendingUp, Timer, Trash2, Edit3, X, LogOut, Mail, Lock, User: UserIcon, ShieldAlert, Award, ChevronRight, Activity } = lucide;
+        // Importamos Firebase desde CDN
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, setDoc, doc, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        const manualFirebaseConfig = {
+        // CONFIGURACIÓN DE FIREBASE
+        const firebaseConfig = {
             apiKey: "AIzaSyB5TTnMn1co3GA_oX3jrZ5KZ8KzRbXbhGQ",
             authDomain: "gym-pro-4588d.firebaseapp.com",
             projectId: "gym-pro-4588d",
@@ -39,261 +29,144 @@
             appId: "1:177629353240:web:3a7b3f73d05c9468347a6d"
         };
 
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
         const appId = "gym-track-pro-v1";
 
-        // Utility: Estimación de 1RM (Fórmula de Epley)
-        const calc1RM = (w, r) => r === 1 ? w : Math.round(w * (1 + r/30));
+        const { useState, useEffect, useRef } = React;
 
+        // Componentes UI Reutilizables
+        const Card = ({ children, className = "", onClick = null }) => (
+            <div onClick={onClick} className={`bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-xl rounded-3xl p-5 shadow-2xl transition-all duration-300 ${className}`}>
+                {children}
+            </div>
+        );
+
+        const Badge = ({ children }) => (
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter border bg-lime-400/10 text-lime-400 border-lime-400/20">
+                {children}
+            </span>
+        );
+
+        // Componente Principal
         function App() {
-            const [firebase, setFirebase] = useState(null);
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [routines, setRoutines] = useState([]);
             const [workouts, setWorkouts] = useState([]);
-            const [lastWorkouts, setLastWorkouts] = useState({}); // Memoria de records
             const [currentWorkout, setCurrentWorkout] = useState(null);
             const [restTime, setRestTime] = useState(0);
-            const [isEditingRoutine, setIsEditingRoutine] = useState(false);
-            const [routineForm, setRoutineForm] = useState({ name: '', exercises: [{ name: '', targetSets: 3 }] });
+            const timerRef = useRef(null);
 
             useEffect(() => {
-                const checkFirebase = setInterval(() => {
-                    if (window.FirebaseSDK) {
-                        const sdk = window.FirebaseSDK;
-                        const app = sdk.initializeApp(manualFirebaseConfig);
-                        const auth = sdk.getAuth(app);
-                        const db = sdk.getFirestore(app);
-                        setFirebase({ auth, db, sdk });
-                        clearInterval(checkFirebase);
-                        sdk.onAuthStateChanged(auth, u => { setUser(u); setLoading(false); });
-                    }
-                }, 100);
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
             }, []);
 
             useEffect(() => {
-                if (!user || !firebase) return;
-                const { db, sdk } = firebase;
-                return sdk.onSnapshot(sdk.collection(db, 'artifacts', appId, 'users', user.uid, 'routines'), (snap) => {
+                if (!user) return;
+                const unsubRo = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'routines'), (snap) => {
                     setRoutines(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
-            }, [user, firebase]);
+                return () => unsubRo();
+            }, [user]);
 
-            useEffect(() => {
-                if (!user || !firebase) return;
-                const { db, sdk } = firebase;
-                const q = sdk.query(sdk.collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), sdk.orderBy('date', 'desc'), sdk.limit(20));
-                return sdk.onSnapshot(q, (snap) => {
-                    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    setWorkouts(data);
-                    
-                    // Mapear el último rendimiento por ejercicio para referencia rápida
-                    const historyMap = {};
-                    data.forEach(w => {
-                        w.exercises.forEach(ex => {
-                            if (!historyMap[ex.name]) historyMap[ex.name] = ex.sets;
-                        });
-                    });
-                    setLastWorkouts(historyMap);
-                });
-            }, [user, firebase]);
+            if (loading) return <div className="h-screen flex items-center justify-center text-lime-400 font-bold italic uppercase tracking-widest">Cargando Sistema...</div>;
 
-            const updateSet = (exIndex, setIndex, field, value) => {
-                const newWorkout = { ...currentWorkout };
-                newWorkout.exercises[exIndex].sets[setIndex][field] = value;
-                setCurrentWorkout(newWorkout);
-            };
-
-            if (loading) return <div className="min-h-screen flex items-center justify-center text-lime-400 font-pro animate-pulse">CARGANDO_SISTEMA...</div>;
-            if (!user) return <AuthScreen firebase={firebase} />;
+            if (!user) return <AuthScreen auth={auth} signInAnonymously={signInAnonymously} signInWithEmailAndPassword={signInWithEmailAndPassword} />;
 
             return (
-                <div className="max-w-md mx-auto min-h-screen pb-24 px-4 pt-6">
-                    {/* Header Pro */}
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <h1 className="font-pro text-2xl font-black text-white italic">ULTRA<span className="text-lime-400">TRACK</span></h1>
-                            <p className="text-[10px] text-zinc-500 tracking-[0.3em] font-bold">ELITE ATHLETE PROTOCOL</p>
-                        </div>
-                        <div className="flex gap-3">
-                            {currentWorkout && (
-                                <div className="flex items-center gap-2 bg-lime-400/10 px-3 py-1 rounded-full border border-lime-400/20">
-                                    <div className="w-2 h-2 bg-lime-400 rounded-full animate-ping" />
-                                    <span className="text-lime-400 font-pro text-[10px]">LIVE</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {activeTab === 'dashboard' && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="glass p-4 rounded-3xl">
-                                    <p className="text-zinc-500 text-[9px] font-black uppercase">Sesiones Mes</p>
-                                    <p className="text-2xl font-pro text-white">{workouts.length}</p>
-                                </div>
-                                <div className="glass p-4 rounded-3xl">
-                                    <p className="text-zinc-500 text-[9px] font-black uppercase">Volumen Total</p>
-                                    <p className="text-2xl font-pro text-lime-400">{(workouts[0]?.totalVolume / 1000 || 0).toFixed(1)}<span className="text-xs">t</span></p>
-                                </div>
+                <div className="pb-32 max-w-lg mx-auto">
+                    {/* Header */}
+                    <header className="p-6 flex justify-between items-center sticky top-0 z-50 bg-[#050505]/80 backdrop-blur-md border-b border-zinc-900/50">
+                        <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 bg-lime-400 rounded-xl flex items-center justify-center text-black">
+                                <i data-lucide="zap"></i>
                             </div>
-
-                            <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                                <Activity size={14} className="text-lime-400" /> Protocolos Disponibles
-                            </h3>
-                            
-                            {routines.map(r => (
-                                <div key={r.id} onClick={() => {
-                                    setCurrentWorkout({
-                                        routineName: r.name,
-                                        exercises: r.exercises.map(ex => ({
-                                            ...ex,
-                                            sets: Array.from({ length: 3 }, () => ({ weight: 0, reps: 0, rpe: 8, completed: false }))
-                                        }))
-                                    });
-                                    setActiveTab('active');
-                                }} className="glass p-5 rounded-[2rem] flex justify-between items-center group active:scale-95 transition-all cursor-pointer border-l-4 border-l-lime-400">
-                                    <div>
-                                        <h4 className="font-pro text-lg italic text-white group-hover:text-lime-400 transition-colors uppercase">{r.name}</h4>
-                                        <p className="text-zinc-500 text-[10px] font-bold">{r.exercises.length} EJERCICIOS ESPECÍFICOS</p>
-                                    </div>
-                                    <ChevronRight className="text-zinc-700 group-hover:text-lime-400" />
-                                </div>
-                            ))}
-                            
-                            <button onClick={() => setIsEditingRoutine(true)} className="w-full py-4 rounded-2xl border border-dashed border-zinc-800 text-zinc-500 font-bold text-xs uppercase hover:bg-zinc-900 transition-all">+ Crear Nuevo Protocolo</button>
+                            <h1 className="font-black italic tracking-tighter text-xl">GYMTRACK</h1>
                         </div>
-                    )}
+                        <button onClick={() => signOut(auth)} className="text-zinc-500 hover:text-white"><i data-lucide="log-out"></i></button>
+                    </header>
 
-                    {activeTab === 'active' && currentWorkout && (
-                        <div className="space-y-6 pb-20">
-                            <div className="flex justify-between items-end">
-                                <h2 className="font-pro text-2xl italic text-lime-400">{currentWorkout.routineName}</h2>
-                                <button onClick={async () => {
-                                    const vol = currentWorkout.exercises.reduce((acc, ex) => 
-                                        acc + ex.sets.reduce((sAcc, s) => sAcc + (s.completed ? (s.weight * s.reps) : 0), 0), 0
-                                    );
-                                    await firebase.sdk.addDoc(firebase.sdk.collection(firebase.db, 'artifacts', appId, 'users', user.uid, 'workouts'), {
-                                        ...currentWorkout, totalVolume: vol, date: firebase.sdk.Timestamp.now()
-                                    });
-                                    setCurrentWorkout(null); setActiveTab('dashboard');
-                                }} className="bg-lime-400 text-black px-6 py-2 rounded-full font-pro text-xs italic font-black shadow-lg shadow-lime-400/20">LOG_FINISH</button>
+                    {/* Dashboard */}
+                    <main className="px-6 py-4 space-y-6">
+                        {activeTab === 'dashboard' && (
+                            <>
+                                <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Rutinas Activas</h3>
+                                {routines.map(r => (
+                                    <Card key={r.id} className="hover:border-lime-400/30">
+                                        <Badge>{r.exercises?.length || 0} Movimientos</Badge>
+                                        <h4 className="text-xl font-black italic uppercase mt-1">{r.name}</h4>
+                                        <button 
+                                            onClick={() => {
+                                                setCurrentWorkout({ routineName: r.name, exercises: r.exercises });
+                                                setActiveTab('active');
+                                            }}
+                                            className="mt-4 w-full bg-zinc-800 py-3 rounded-2xl font-bold text-xs hover:bg-lime-400 hover:text-black transition-colors"
+                                        >
+                                            ENTRENAR AHORA
+                                        </button>
+                                    </Card>
+                                ))}
+                            </>
+                        )}
+
+                        {activeTab === 'active' && currentWorkout && (
+                            <div className="space-y-4">
+                                <div className="bg-lime-400 text-black p-4 rounded-3xl flex justify-between items-center">
+                                    <h2 className="font-black italic uppercase">{currentWorkout.routineName}</h2>
+                                    <button onClick={() => setActiveTab('dashboard')} className="font-black text-xs uppercase border-b border-black">Cancelar</button>
+                                </div>
+                                {currentWorkout.exercises.map((ex, i) => (
+                                    <Card key={i} className="flex justify-between items-center">
+                                        <span className="font-bold uppercase italic">{ex.name}</span>
+                                        <div className="flex gap-2">
+                                            <div className="bg-zinc-800 px-3 py-1 rounded-lg text-xs font-bold">{ex.targetSets} Sets</div>
+                                        </div>
+                                    </Card>
+                                ))}
+                                <button className="w-full bg-white text-black p-5 rounded-[2rem] font-black italic text-xl">GUARDAR SESIÓN</button>
                             </div>
+                        )}
+                    </main>
 
-                            {currentWorkout.exercises.map((ex, i) => (
-                                <div key={i} className="glass p-4 rounded-[2rem] space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <h3 className="font-pro text-sm italic text-white uppercase">{ex.name}</h3>
-                                        <Award size={16} className="text-zinc-800" />
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <div className="grid grid-cols-6 gap-2 text-[8px] font-black text-zinc-600 uppercase px-2 text-center">
-                                            <span>Serie</span><span>Prev</span><span className="col-span-2">Carga/Reps</span><span>RPE</span><span></span>
-                                        </div>
-                                        {ex.sets.map((s, si) => (
-                                            <div key={si} className={`grid grid-cols-6 gap-2 items-center transition-all ${s.completed ? 'opacity-40 scale-95' : ''}`}>
-                                                <div className="text-center font-pro text-xs text-zinc-500">{si+1}</div>
-                                                
-                                                {/* Referencia fantasma: Lo que hiciste el último día */}
-                                                <div className="text-center text-[10px] text-zinc-600 font-bold italic">
-                                                    {lastWorkouts[ex.name]?.[si] ? `${lastWorkouts[ex.name][si].weight}x${lastWorkouts[ex.name][si].reps}` : '--'}
-                                                </div>
-
-                                                <input type="number" placeholder="Kg" className="bg-zinc-800/50 p-2 rounded-lg text-center font-pro text-xs outline-none focus:ring-1 ring-lime-400"
-                                                    onChange={e => updateSet(i, si, 'weight', Number(e.target.value))} />
-                                                
-                                                <input type="number" placeholder="R" className="bg-zinc-800/50 p-2 rounded-lg text-center font-pro text-xs outline-none focus:ring-1 ring-lime-400"
-                                                    onChange={e => updateSet(i, si, 'reps', Number(e.target.value))} />
-
-                                                {/* Selector de RPE: Vital para autorregulación */}
-                                                <select className="bg-zinc-800/50 p-2 rounded-lg text-[10px] font-bold text-lime-400 outline-none appearance-none text-center"
-                                                    onChange={e => updateSet(i, si, 'rpe', Number(e.target.value))}>
-                                                    {[6,7,8,9,10].map(v => <option key={v} value={v}>@{v}</option>)}
-                                                </select>
-
-                                                <button onClick={() => {
-                                                    updateSet(i, si, 'completed', !s.completed);
-                                                    if (!s.completed) setRestTime(90);
-                                                }} className={`h-8 rounded-lg flex items-center justify-center ${s.completed ? 'bg-lime-400 text-black' : 'bg-zinc-800 text-zinc-600'}`}>
-                                                    <CheckCircle2 size={16} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    
-                                    {/* Métrica en vivo de 1RM Estimado */}
-                                    {ex.sets[0].weight > 0 && (
-                                        <div className="pt-2 border-t border-zinc-800/50 flex justify-between items-center">
-                                            <span className="text-[9px] font-black text-zinc-600 uppercase">1RM Estimado hoy:</span>
-                                            <span className="text-xs font-pro text-lime-400">{calc1RM(ex.sets[0].weight, ex.sets[0].reps)} KG</span>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Nav Bar flotante estilo Cyberpunk */}
-                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] glass rounded-full p-2 flex justify-between items-center z-50">
-                        <button onClick={() => setActiveTab('dashboard')} className={`p-4 rounded-full ${activeTab === 'dashboard' ? 'text-lime-400 bg-lime-400/10' : 'text-zinc-600'}`}><LayoutDashboard size={20}/></button>
-                        <button onClick={() => setActiveTab('historial')} className={`p-4 rounded-full ${activeTab === 'historial' ? 'text-lime-400 bg-lime-400/10' : 'text-zinc-600'}`}><History size={20}/></button>
-                        <button onClick={() => setActiveTab('dashboard')} className="bg-lime-400 text-black p-4 rounded-full shadow-lg shadow-lime-400/30"><Plus size={24}/></button>
-                        <button onClick={() => setActiveTab('analytics')} className={`p-4 rounded-full ${activeTab === 'analytics' ? 'text-lime-400 bg-lime-400/10' : 'text-zinc-600'}`}><TrendingUp size={20}/></button>
-                        <button onClick={() => setActiveTab('ajustes')} className={`p-4 rounded-full ${activeTab === 'ajustes' ? 'text-lime-400 bg-lime-400/10' : 'text-zinc-600'}`}><Settings size={20}/></button>
+                    {/* Navbar */}
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-[100] bg-zinc-900 border border-zinc-800 p-2 rounded-full flex justify-around">
+                        <button onClick={() => setActiveTab('dashboard')} className={`p-4 ${activeTab === 'dashboard' ? 'text-lime-400' : 'text-zinc-600'}`}><i data-lucide="layout-dashboard"></i></button>
+                        <button onClick={() => setActiveTab('active')} className={`p-4 ${activeTab === 'active' ? 'text-lime-400' : 'text-zinc-600'}`}><i data-lucide="flame"></i></button>
+                        <button onClick={() => setActiveTab('settings')} className="p-4 text-zinc-600"><i data-lucide="settings"></i></button>
                     </nav>
-
-                    {/* Overlay de Descanso con Motivación Visual */}
-                    {restTime > 0 && (
-                        <div className="fixed inset-0 z-[100] bg-black/98 flex flex-col items-center justify-center p-10 text-center">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-zinc-900">
-                                <div className="h-full bg-lime-400 transition-all duration-1000" style={{width: `${(restTime/90)*100}%`}} />
-                            </div>
-                            <h4 className="text-zinc-500 font-pro text-xs tracking-widest mb-4 uppercase">Recuperación Celular</h4>
-                            <span className="text-8xl font-pro font-black italic text-white">{restTime}<span className="text-2xl text-lime-400">s</span></span>
-                            <div className="mt-8 space-y-2">
-                                <p className="text-zinc-600 text-[10px] font-bold uppercase italic">"La victoria se entrena en el silencio del descanso"</p>
-                            </div>
-                            <button onClick={() => setRestTime(0)} className="mt-12 px-10 py-4 border border-zinc-800 rounded-full font-pro text-[10px] text-zinc-400 hover:text-white uppercase tracking-widest">Saltar Recovery</button>
-                        </div>
-                    )}
                 </div>
             );
         }
 
-        // Pantalla de Auth (Minimalista)
-        function AuthScreen({ firebase }) {
-            const [email, setEmail] = useState('');
-            const [pass, setPass] = useState('');
-            const [loading, setLoading] = useState(false);
-
+        function AuthScreen({ auth, signInAnonymously }) {
             return (
-                <div className="min-h-screen flex items-center justify-center p-8">
-                    <div className="glass w-full p-8 rounded-[3rem] space-y-8">
-                        <div className="text-center">
-                            <Zap className="text-lime-400 mx-auto mb-4" size={40} fill="currentColor" />
-                            <h1 className="font-pro text-3xl font-black italic">SISTEMA_ACCESO</h1>
-                        </div>
-                        <div className="space-y-4">
-                            <input type="email" placeholder="EMAIL_ID" className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl outline-none font-pro text-xs text-lime-400 focus:border-lime-400" value={email} onChange={e=>setEmail(e.target.value)} />
-                            <input type="password" placeholder="PASSWORD_SECURE" className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl outline-none font-pro text-xs text-lime-400 focus:border-lime-400" value={pass} onChange={e=>setPass(e.target.value)} />
-                            <button onClick={async ()=>{
-                                setLoading(true);
-                                try { await firebase.sdk.signInWithEmailAndPassword(firebase.auth, email, pass); }
-                                catch { await firebase.sdk.createUserWithEmailAndPassword(firebase.auth, email, pass); }
-                                setLoading(false);
-                            }} className="w-full bg-lime-400 text-black py-4 rounded-2xl font-pro text-sm italic font-black">
-                                {loading ? 'INICIALIZANDO...' : 'EJECUTAR_ACCESO'}
-                            </button>
-                            <button onClick={()=>firebase.sdk.signInAnonymously(firebase.auth)} className="w-full text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Entrar como Sujeto de Pruebas (Invitado)</button>
-                        </div>
-                    </div>
+                <div className="h-screen flex items-center justify-center p-6">
+                    <Card className="w-full text-center space-y-6">
+                        <div className="text-lime-400 flex justify-center"><i data-lucide="zap" size="48"></i></div>
+                        <h1 className="text-3xl font-black italic uppercase">GYMTRACK</h1>
+                        <p className="text-zinc-500 text-sm">Entrena. Registra. Supera.</p>
+                        <button 
+                            onClick={() => signInAnonymously(auth)}
+                            className="w-full bg-lime-400 text-black p-4 rounded-2xl font-black italic text-lg shadow-lg shadow-lime-400/20"
+                        >
+                            ACCESO RÁPIDO
+                        </button>
+                    </Card>
                 </div>
             );
         }
 
+        // Renderizar App e inicializar iconos después
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
+        setTimeout(() => lucide.createIcons(), 500);
     </script>
 </body>
 </html>
