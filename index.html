@@ -3,23 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GymTrack Pro - GitHub Pages</title>
+    <title>GymTrack Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #050505; }
+    </style>
 </head>
-<body class="bg-[#050505] text-zinc-100 font-sans selection:bg-lime-400 selection:text-black">
+<body>
     <div id="root"></div>
 
-    <script type="text/babel">
-        // Importamos Firebase desde CDN
+    <script type="text/babel" data-type="module">
+        // Importaciones de Firebase desde CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, setDoc, doc, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // CONFIGURACIÓN DE FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyB5TTnMn1co3GA_oX3jrZ5KZ8KzRbXbhGQ",
             authDomain: "gym-pro-4588d.firebaseapp.com",
@@ -32,141 +36,101 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = "gym-track-pro-v1";
 
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
 
-        // Componentes UI Reutilizables
-        const Card = ({ children, className = "", onClick = null }) => (
-            <div onClick={onClick} className={`bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-xl rounded-3xl p-5 shadow-2xl transition-all duration-300 ${className}`}>
-                {children}
-            </div>
-        );
+        // --- COMPONENTES ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const ref = React.useRef(null);
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons({
+                        attrs: { class: className, "stroke-width": 2.5 },
+                        nameAttr: 'data-lucide'
+                    });
+                }
+            }, [name]);
+            return <i data-lucide={name} style={{width: size, height: size}} className={className}></i>;
+        };
 
-        const Badge = ({ children }) => (
-            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter border bg-lime-400/10 text-lime-400 border-lime-400/20">
-                {children}
-            </span>
-        );
-
-        // Componente Principal
         function App() {
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [routines, setRoutines] = useState([]);
-            const [workouts, setWorkouts] = useState([]);
-            const [currentWorkout, setCurrentWorkout] = useState(null);
-            const [restTime, setRestTime] = useState(0);
-            const timerRef = useRef(null);
 
             useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                const unsub = onAuthStateChanged(auth, (u) => {
                     setUser(u);
                     setLoading(false);
                 });
-                return () => unsubscribe();
+                return () => unsub();
             }, []);
 
-            useEffect(() => {
-                if (!user) return;
-                const unsubRo = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'routines'), (snap) => {
-                    setRoutines(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                });
-                return () => unsubRo();
-            }, [user]);
+            if (loading) return (
+                <div className="h-screen flex flex-col items-center justify-center bg-black text-lime-400">
+                    <div className="animate-spin mb-4"><Icon name="loader" size={40} /></div>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Iniciando Sistema</p>
+                </div>
+            );
 
-            if (loading) return <div className="h-screen flex items-center justify-center text-lime-400 font-bold italic uppercase tracking-widest">Cargando Sistema...</div>;
-
-            if (!user) return <AuthScreen auth={auth} signInAnonymously={signInAnonymously} signInWithEmailAndPassword={signInWithEmailAndPassword} />;
+            if (!user) return <AuthScreen />;
 
             return (
-                <div className="pb-32 max-w-lg mx-auto">
-                    {/* Header */}
-                    <header className="p-6 flex justify-between items-center sticky top-0 z-50 bg-[#050505]/80 backdrop-blur-md border-b border-zinc-900/50">
+                <div className="min-h-screen text-white p-6">
+                    <header className="flex justify-between items-center mb-10">
                         <div className="flex items-center gap-2">
-                            <div className="w-10 h-10 bg-lime-400 rounded-xl flex items-center justify-center text-black">
-                                <i data-lucide="zap"></i>
+                            <div className="bg-lime-400 p-2 rounded-lg text-black">
+                                <Icon name="zap" />
                             </div>
-                            <h1 className="font-black italic tracking-tighter text-xl">GYMTRACK</h1>
+                            <h1 className="text-2xl font-black italic tracking-tighter">GYMTRACK</h1>
                         </div>
-                        <button onClick={() => signOut(auth)} className="text-zinc-500 hover:text-white"><i data-lucide="log-out"></i></button>
+                        <button onClick={() => signOut(auth)} className="p-2 bg-zinc-900 rounded-full text-zinc-500">
+                            <Icon name="log-out" />
+                        </button>
                     </header>
 
-                    {/* Dashboard */}
-                    <main className="px-6 py-4 space-y-6">
-                        {activeTab === 'dashboard' && (
-                            <>
-                                <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Rutinas Activas</h3>
-                                {routines.map(r => (
-                                    <Card key={r.id} className="hover:border-lime-400/30">
-                                        <Badge>{r.exercises?.length || 0} Movimientos</Badge>
-                                        <h4 className="text-xl font-black italic uppercase mt-1">{r.name}</h4>
-                                        <button 
-                                            onClick={() => {
-                                                setCurrentWorkout({ routineName: r.name, exercises: r.exercises });
-                                                setActiveTab('active');
-                                            }}
-                                            className="mt-4 w-full bg-zinc-800 py-3 rounded-2xl font-bold text-xs hover:bg-lime-400 hover:text-black transition-colors"
-                                        >
-                                            ENTRENAR AHORA
-                                        </button>
-                                    </Card>
-                                ))}
-                            </>
-                        )}
+                    <div className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] text-center space-y-4">
+                        <div className="inline-block p-4 bg-lime-400/10 rounded-full text-lime-400">
+                            <Icon name="user" size={32} />
+                        </div>
+                        <h2 className="text-xl font-bold">¡Bienvenido!</h2>
+                        <p className="text-zinc-500 text-sm">Tu sesión como <b>{user.isAnonymous ? 'Invitado' : user.email}</b> está activa.</p>
+                        <div className="pt-4">
+                            <span className="text-[10px] bg-zinc-800 px-3 py-1 rounded-full text-zinc-400 uppercase font-black">ID: {user.uid.slice(0,8)}</span>
+                        </div>
+                    </div>
 
-                        {activeTab === 'active' && currentWorkout && (
-                            <div className="space-y-4">
-                                <div className="bg-lime-400 text-black p-4 rounded-3xl flex justify-between items-center">
-                                    <h2 className="font-black italic uppercase">{currentWorkout.routineName}</h2>
-                                    <button onClick={() => setActiveTab('dashboard')} className="font-black text-xs uppercase border-b border-black">Cancelar</button>
-                                </div>
-                                {currentWorkout.exercises.map((ex, i) => (
-                                    <Card key={i} className="flex justify-between items-center">
-                                        <span className="font-bold uppercase italic">{ex.name}</span>
-                                        <div className="flex gap-2">
-                                            <div className="bg-zinc-800 px-3 py-1 rounded-lg text-xs font-bold">{ex.targetSets} Sets</div>
-                                        </div>
-                                    </Card>
-                                ))}
-                                <button className="w-full bg-white text-black p-5 rounded-[2rem] font-black italic text-xl">GUARDAR SESIÓN</button>
-                            </div>
-                        )}
-                    </main>
-
-                    {/* Navbar */}
-                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-[100] bg-zinc-900 border border-zinc-800 p-2 rounded-full flex justify-around">
-                        <button onClick={() => setActiveTab('dashboard')} className={`p-4 ${activeTab === 'dashboard' ? 'text-lime-400' : 'text-zinc-600'}`}><i data-lucide="layout-dashboard"></i></button>
-                        <button onClick={() => setActiveTab('active')} className={`p-4 ${activeTab === 'active' ? 'text-lime-400' : 'text-zinc-600'}`}><i data-lucide="flame"></i></button>
-                        <button onClick={() => setActiveTab('settings')} className="p-4 text-zinc-600"><i data-lucide="settings"></i></button>
+                    <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[85%] bg-zinc-900/90 backdrop-blur-xl border border-white/5 p-4 rounded-full flex justify-around shadow-2xl">
+                        <Icon name="layout-dashboard" className="text-lime-400" />
+                        <Icon name="history" className="text-zinc-600" />
+                        <Icon name="plus-circle" className="text-zinc-600" />
+                        <Icon name="settings" className="text-zinc-600" />
                     </nav>
                 </div>
             );
         }
 
-        function AuthScreen({ auth, signInAnonymously }) {
+        function AuthScreen() {
             return (
-                <div className="h-screen flex items-center justify-center p-6">
-                    <Card className="w-full text-center space-y-6">
-                        <div className="text-lime-400 flex justify-center"><i data-lucide="zap" size="48"></i></div>
-                        <h1 className="text-3xl font-black italic uppercase">GYMTRACK</h1>
-                        <p className="text-zinc-500 text-sm">Entrena. Registra. Supera.</p>
+                <div className="h-screen flex items-center justify-center p-6 bg-[#050505]">
+                    <div className="w-full max-w-sm bg-zinc-900/30 border border-zinc-800 p-10 rounded-[3rem] text-center space-y-8">
+                        <Icon name="zap" size={48} className="text-lime-400 mx-auto" />
+                        <div>
+                            <h1 className="text-3xl font-black italic tracking-tighter text-white">GYMTRACK</h1>
+                            <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest mt-2">Elite Performance</p>
+                        </div>
                         <button 
                             onClick={() => signInAnonymously(auth)}
-                            className="w-full bg-lime-400 text-black p-4 rounded-2xl font-black italic text-lg shadow-lg shadow-lime-400/20"
+                            className="w-full bg-lime-400 text-black p-5 rounded-3xl font-black italic text-lg hover:scale-[1.02] transition-transform"
                         >
-                            ACCESO RÁPIDO
+                            ENTRAR AHORA
                         </button>
-                    </Card>
+                    </div>
                 </div>
             );
         }
 
-        // Renderizar App e inicializar iconos después
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
-        setTimeout(() => lucide.createIcons(), 500);
     </script>
 </body>
 </html>
