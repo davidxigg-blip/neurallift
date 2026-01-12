@@ -62,6 +62,25 @@
                 <div class="glass-panel p-6 rounded-3xl"><p class="text-[10px] font-black text-slate-500 uppercase">Series</p><h3 id="stat-sets" class="text-2xl font-black">0</h3></div>
                 <div class="glass-panel p-6 rounded-3xl"><p class="text-[10px] font-black text-slate-500 uppercase">Racha</p><h3 id="streak-count" class="text-2xl font-black">🔥 0 Días</h3></div>
             </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="glass-panel p-6 rounded-[2.5rem]">
+        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Volumen últimos 7 días</h4>
+        <div id="volume-chart" class="flex items-end justify-between h-32 gap-2 px-2">
+            </div>
+    </div>
+
+    <div class="glass-panel p-6 rounded-[2.5rem]">
+        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Calculadora 1RM (Brzycki)</h4>
+        <div class="grid grid-cols-2 gap-4">
+            <input type="number" id="rm-weight" placeholder="KG" class="bg-slate-900 border border-white/5 p-4 rounded-2xl text-sm outline-none focus:border-indigo-500">
+            <input type="number" id="rm-reps" placeholder="REPS" class="bg-slate-900 border border-white/5 p-4 rounded-2xl text-sm outline-none focus:border-indigo-500">
+        </div>
+        <div class="mt-4 p-4 bg-indigo-600/10 rounded-2xl border border-indigo-500/20 text-center">
+            <p class="text-[10px] font-black text-indigo-400 uppercase">Tu Máximo Estimado</p>
+            <h3 id="rm-result" class="text-2xl font-black text-white">0 <span class="text-sm">kg</span></h3>
+        </div>
+    </div>
+</div>
             <div id="workout-history" class="grid gap-3"></div>
         </section>
 
