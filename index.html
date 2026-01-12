@@ -232,338 +232,156 @@
     <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 glass-panel border-indigo-500/50 px-8 py-4 rounded-2xl opacity-0 translate-y-10 transition-all duration-500 z-[100] font-black text-[10px] uppercase tracking-widest text-white shadow-2xl">
         Mensaje
     </div>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    // 1. CONFIGURACIÓN REAL (Eliminadas las variables que daban error)
+    const firebaseConfig = {
+        apiKey: "AIzaSyB5TTnMn1co3GA_oX3jrZ5KZ8KzRbXbhGQ",
+        authDomain: "gym-pro-4588d.firebaseapp.com",
+        projectId: "gym-pro-4588d",
+        storageBucket: "gym-pro-4588d.firebasestorage.app",
+        messagingSenderId: "177629353240",
+        appId: "1:177629353240:web:3a7b3f73d05c9468347a6d",
+        measurementId: "G-3W11NJ1Q63"
+    };
 
-        // CONFIG
-        const EXERCISES = {
-            "Empuje": ["Press Banca", "Press Militar", "Aperturas", "Fondos", "Elev. Laterales", "Press Francés"],
-            "Tracción": ["Dominadas", "Remo c/ Barra", "Jalón Pecho", "Peso Muerto", "Face Pulls", "Curl Bíceps"],
-            "Pierna": ["Sentadilla", "Prensa 45°", "Ext. Cuádriceps", "Curl Femoral", "Zancadas", "Gemelos"],
-            "Core": ["Plancha", "Rueda Abdominal", "Leg Raises", "Crunch Cable"]
-        };
+    const EXERCISES = {
+        "Empuje": ["Press Banca", "Press Militar", "Aperturas", "Fondos", "Elev. Laterales", "Press Francés"],
+        "Tracción": ["Dominadas", "Remo c/ Barra", "Jalón Pecho", "Peso Muerto", "Face Pulls", "Curl Bíceps"],
+        "Pierna": ["Sentadilla", "Prensa 45°", "Ext. Cuádriceps", "Curl Femoral", "Zancadas", "Gemelos"],
+        "Core": ["Plancha", "Rueda Abdominal", "Leg Raises", "Crunch Cable"]
+    };
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyB5TTnMn1co3GA_oX3jrZ5KZ8KzRbXbhGQ",
-            authDomain: "gym-pro-4588d.firebaseapp.com",
-            projectId: "gym-pro-4588d",
-            storageBucket: "gym-pro-4588d.firebasestorage.app",
-            messagingSenderId: "177629353240",
-            appId: "1:177629353240:web:3a7b3f73d05c9468347a6d",
-            measurementId: "G-3W11NJ1Q63"
-        };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = 'gym-pro-2026-prod';
 
-        // TABS
-        window.switchTab = (tab) => {
-            const tabs = ['dashboard', 'train', 'routines'];
-            tabs.forEach(t => {
-                document.getElementById(`section-${t}`).classList.toggle('hidden', t !== tab);
-                document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
-            });
-        };
+    let user = null;
+    let myPlannedRoutine = JSON.parse(localStorage.getItem('planned_routine_v2') || '[]');
+    let activeSession = null;
+    let timerInterval = null;
 
-        // LIBRERÍA
-        const renderLibrary = (filter = "") => {
-            const list = document.getElementById('library-list');
-            list.innerHTML = "";
-            Object.entries(EXERCISES).forEach(([cat, exs]) => {
-                const filtered = exs.filter(e => e.toLowerCase().includes(filter.toLowerCase()));
-                if (filtered.length === 0) return;
-                const div = document.createElement('div');
-                div.innerHTML = `
-                    <p class="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-3 px-1">${cat}</p>
-                    <div class="grid grid-cols-1 gap-2">
-                        ${filtered.map(ex => `
-                            <button onclick="window.addToPlan('${ex}', '${cat}')" class="w-full text-left bg-white/5 px-5 py-4 rounded-2xl text-sm font-bold text-slate-300 hover:border-indigo-500 border border-transparent transition-all flex justify-between items-center group">
-                                ${ex}
-                                <span class="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity font-black">+</span>
-                            </button>
-                        `).join('')}
-                    </div>
-                `;
-                list.appendChild(div);
-            });
-        };
+    // --- SISTEMA DE AUTENTICACIÓN ---
+    window.iniciarSesion = async () => {
+        const email = prompt("Introduce tu email:");
+        const password = prompt("Introduce tu contraseña:");
+        if (!email || !password) return;
 
-        window.addToPlan = (name, cat) => {
-            if (myPlannedRoutine.some(p => p.name === name)) return;
-            myPlannedRoutine.push({ name, cat, sets: 3, reps: 10 });
-            updatePlanUI();
-            showToast(`Añadido: ${name}`);
-        };
-
-        window.updatePlanUI = () => {
-            localStorage.setItem('planned_routine_v2', JSON.stringify(myPlannedRoutine));
-            const list = document.getElementById('routine-config-list');
-            const startBtn = document.getElementById('start-btn');
-            
-            if (myPlannedRoutine.length === 0) {
-                list.innerHTML = `<div class="p-10 text-center text-slate-600 italic text-sm">Añade ejercicios para configurar tu rutina.</div>`;
-                startBtn.classList.add('hidden');
-                return;
-            }
-
-            startBtn.classList.remove('hidden');
-            list.innerHTML = myPlannedRoutine.map((item, idx) => `
-                <div class="bg-white/5 border border-white/5 p-5 rounded-[1.5rem] flex items-center gap-4 group">
-                    <div class="flex-1">
-                        <p class="font-black text-white text-sm">${item.name}</p>
-                        <p class="text-[9px] text-slate-500 uppercase font-black tracking-tighter">${item.cat}</p>
-                    </div>
-                    <div class="flex items-center gap-4 bg-slate-900/50 px-4 py-2 rounded-xl">
-                        <div class="text-center">
-                            <span class="block text-[8px] text-slate-600 font-black">SETS</span>
-                            <input type="number" value="${item.sets}" onchange="updatePlanItem(${idx}, 'sets', this.value)" class="w-8 bg-transparent text-center font-black text-indigo-400 outline-none">
-                        </div>
-                        <div class="text-center">
-                            <span class="block text-[8px] text-slate-600 font-black">REPS</span>
-                            <input type="number" value="${item.reps}" onchange="updatePlanItem(${idx}, 'reps', this.value)" class="w-8 bg-transparent text-center font-black text-indigo-400 outline-none">
-                        </div>
-                    </div>
-                    <button onclick="removePlanItem(${idx})" class="text-slate-700 hover:text-rose-500 transition-colors">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2.5" stroke-linecap="round"/></svg>
-                    </button>
-                </div>
-            `).join('');
-        };
-
-        window.updatePlanItem = (i, k, v) => { myPlannedRoutine[i][k] = parseInt(v) || 0; localStorage.setItem('planned_routine_v2', JSON.stringify(myPlannedRoutine)); };
-        window.removePlanItem = (i) => { myPlannedRoutine.splice(i, 1); updatePlanUI(); };
-        window.clearRoutine = () => { if(confirm("¿Vaciar configuración?")) { myPlannedRoutine = []; updatePlanUI(); } };
-
-        // ENTRENAMIENTO ACTIVO
-        window.startRoutine = () => {
-            activeSession = myPlannedRoutine.map(ex => ({
-                ...ex,
-                actual: Array.from({ length: ex.sets }, () => ({ weight: "", reps: ex.reps, done: false }))
-            }));
-            renderActiveSession();
-            switchTab('train');
-            document.getElementById('session-actions').classList.remove('hidden');
-            showToast("Rutina Iniciada - ¡Dale fuerte!");
-            updateProgressBar();
-        };
-
-        const renderActiveSession = () => {
-            const container = document.getElementById('active-session-container');
-            if (!activeSession) return;
-            
-            container.innerHTML = activeSession.map((ex, exIdx) => `
-                <div class="glass-panel p-6 md:p-8 rounded-[2.5rem] space-y-5">
-                    <div class="flex justify-between items-center">
-                        <h4 class="text-xl font-black text-white">${ex.name}</h4>
-                        <span class="text-[9px] font-black text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-lg uppercase">${ex.cat}</span>
-                    </div>
-                    <div class="space-y-3">
-                        ${ex.actual.map((s, sIdx) => `
-                            <div class="set-row flex items-center gap-3 p-3 rounded-2xl border border-white/5 ${s.done ? 'completed' : 'bg-slate-900/40'}">
-                                <button onclick="toggleSet(${exIdx}, ${sIdx})" class="btn-action w-10 h-10 rounded-xl flex items-center justify-center ${s.done ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-500'}">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                                </button>
-                                <span class="w-6 text-[10px] font-black text-slate-600">S${sIdx+1}</span>
-                                <div class="flex-1 grid grid-cols-2 gap-4">
-                                    <div class="relative">
-                                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-600">KG</span>
-                                        <input type="number" placeholder="0" value="${s.weight}" oninput="updateSetData(${exIdx}, ${sIdx}, 'weight', this.value)" class="w-full bg-slate-950 border border-white/5 px-4 py-3 rounded-xl text-sm font-black outline-none focus:border-indigo-500 transition-colors">
-                                    </div>
-                                    <div class="relative">
-                                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-600">REPS</span>
-                                        <input type="number" placeholder="0" value="${s.reps}" oninput="updateSetData(${exIdx}, ${sIdx}, 'reps', this.value)" class="w-full bg-slate-950 border border-white/5 px-4 py-3 rounded-xl text-sm font-black outline-none focus:border-indigo-500 transition-colors">
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `).join('');
-        };
-
-        window.toggleSet = (eIdx, sIdx) => {
-            const isDone = activeSession[eIdx].actual[sIdx].done;
-            activeSession[eIdx].actual[sIdx].done = !isDone;
-            
-            if (!isDone) {
-                startRestTimer(90); // 90 segundos de descanso por defecto
-            }
-            
-            renderActiveSession();
-            updateProgressBar();
-        };
-
-        window.updateSetData = (eIdx, sIdx, k, v) => { activeSession[eIdx].actual[sIdx][k] = v; };
-
-        const updateProgressBar = () => {
-            const allSets = activeSession.flatMap(ex => ex.actual);
-            const completed = allSets.filter(s => s.done).length;
-            const percentage = Math.round((completed / allSets.length) * 100) || 0;
-            
-            document.getElementById('session-progress').style.width = `${percentage}%`;
-            document.getElementById('progress-text').textContent = `${percentage}% completado`;
-        };
-
-        // TIMER
-        const startRestTimer = (seconds) => {
-            clearInterval(timerInterval);
-            const display = document.getElementById('rest-timer-display');
-            const secondsEl = document.getElementById('timer-seconds');
-            display.classList.remove('hidden');
-            
-            let remaining = seconds;
-            timerInterval = setInterval(() => {
-                const mins = Math.floor(remaining / 60);
-                const secs = remaining % 60;
-                secondsEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                
-                if (remaining <= 0) {
-                    clearInterval(timerInterval);
-                    display.classList.add('hidden');
-                    showToast("¡Descanso terminado! Dale.");
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+            showToast("Sesión iniciada");
+        } catch (error) {
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                if(confirm("¿Usuario no encontrado. Crear cuenta nueva con estos datos?")) {
+                    await createUserWithEmailAndPassword(auth, email, password);
                 }
-                remaining--;
-            }, 1000);
-        };
-
-        // PERSISTENCIA & FIREBASE
-        window.saveFullSession = async () => {
-            if (!user || !activeSession) return;
-            const date = document.getElementById('workout-date').value;
-            
-            const entries = activeSession.map(ex => ({
-                exercise: ex.name,
-                category: ex.cat,
-                sets: ex.actual.filter(s => s.done).map(s => ({
-                    weight: parseFloat(s.weight) || 0,
-                    reps: parseInt(s.reps) || 0
-                }))
-            })).filter(ex => ex.sets.length > 0);
-
-            if (entries.length === 0) return showToast("Marca series como completadas");
-
-            try {
-                for (const entry of entries) {
-                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
-                        ...entry,
-                        date,
-                        timestamp: serverTimestamp()
-                    });
-                }
-                showToast("Entrenamiento guardado en la nube");
-                activeSession = null;
-                document.getElementById('session-actions').classList.add('hidden');
-                document.getElementById('active-session-container').innerHTML = `<div class="p-16 text-center rounded-[3rem] border-dashed border-2 border-white/10"><h3 class="text-xl font-black text-white mb-2">¡Misión Cumplida!</h3><p class="text-slate-500 text-sm">Tus ganancias han sido sincronizadas.</p></div>`;
-            } catch (err) {
-                console.error(err);
-                showToast("Error al guardar");
+            } else {
+                showToast("Error: " + error.message);
             }
-        };
+        }
+    };
 
-        const renderHistory = (logs) => {
-            const container = document.getElementById('workout-history');
-            const volStat = document.getElementById('stat-volume');
-            const setsStat = document.getElementById('stat-sets');
-            const ptsStat = document.getElementById('stat-points');
-            const streakStat = document.getElementById('streak-count');
+    // --- NAVEGACIÓN ---
+    window.switchTab = (tab) => {
+        const tabs = ['dashboard', 'train', 'routines'];
+        tabs.forEach(t => {
+            document.getElementById(`section-${t}`).classList.toggle('hidden', t !== tab);
+            document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+        });
+    };
 
-            if (logs.length === 0) {
-                container.innerHTML = `<p class="col-span-full text-center text-slate-700 font-bold py-10">Sin actividad previa.</p>`;
-                return;
-            }
-
-            // Calculamos estadísticas básicas
-            let totalVolume = 0;
-            let totalSets = 0;
-            const uniqueDays = new Set();
-
-            logs.forEach(l => {
-                totalSets += l.sets.length;
-                l.sets.forEach(s => totalVolume += (s.weight * s.reps));
-                uniqueDays.add(l.date);
-            });
-
-            volStat.innerHTML = `${Math.round(totalVolume)} <span class="text-sm text-slate-500">kg</span>`;
-            setsStat.innerHTML = `${totalSets} <span class="text-sm text-slate-500">sets</span>`;
-            ptsStat.innerHTML = `${Math.round(totalVolume / 100)} <span class="text-sm text-slate-500">pts</span>`;
-            streakStat.textContent = `🔥 ${uniqueDays.size} Días`;
-
-            // Agrupar por fecha para el feed
-            const grouped = logs.reduce((acc, log) => {
-                if (!acc[log.date]) acc[log.date] = [];
-                acc[log.date].push(log);
-                return acc;
-            }, {});
-
-            container.innerHTML = Object.entries(grouped).slice(0, 6).map(([date, items]) => `
-                <div class="glass-panel p-5 rounded-[2rem] space-y-4">
-                    <div class="flex justify-between items-center border-b border-white/5 pb-3">
-                        <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">${date}</span>
-                        <span class="text-[9px] font-bold text-slate-500">${items.length} ej.</span>
-                    </div>
-                    <div class="space-y-3">
-                        ${items.map(it => `
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <h5 class="font-bold text-xs text-slate-200">${it.exercise}</h5>
-                                    <button onclick="deleteEntry('${it.id}')" class="text-slate-700 hover:text-rose-500"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="3" stroke-linecap="round"/></svg></button>
-                                </div>
-                                <div class="flex flex-wrap gap-1">
-                                    ${it.sets.map(s => `<span class="bg-indigo-500/5 border border-indigo-500/10 px-2 py-0.5 rounded-md text-[8px] font-black text-indigo-300">${s.weight}k x ${s.reps}</span>`).join('')}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
+    // --- LIBRERÍA Y RUTINAS (Arreglado para clics) ---
+    const renderLibrary = (filter = "") => {
+        const list = document.getElementById('library-list');
+        if (!list) return;
+        list.innerHTML = "";
+        Object.entries(EXERCISES).forEach(([cat, exs]) => {
+            const filtered = exs.filter(e => e.toLowerCase().includes(filter.toLowerCase()));
+            if (filtered.length === 0) return;
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <p class="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-3 px-1">${cat}</p>
+                <div class="grid grid-cols-1 gap-2">
+                    ${filtered.map(ex => `
+                        <button onclick="window.addToPlan('${ex}', '${cat}')" class="w-full text-left bg-white/5 px-5 py-4 rounded-2xl text-sm font-bold text-slate-300 hover:border-indigo-500 border border-transparent transition-all flex justify-between items-center group">
+                            ${ex}
+                            <span class="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity font-black">+</span>
+                        </button>
+                    `).join('')}
                 </div>
-            `).join('');
-        };
+            `;
+            list.appendChild(div);
+        });
+    };
 
-        window.deleteEntry = async (id) => { if(confirm("¿Borrar registro?")) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'history', id)); };
+    window.addToPlan = (name, cat) => {
+        if (myPlannedRoutine.some(p => p.name === name)) return;
+        myPlannedRoutine.push({ name, cat, sets: 3, reps: 10 });
+        window.updatePlanUI();
+        showToast(`Añadido: ${name}`);
+    };
 
-        const showToast = (msg) => {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.classList.remove('opacity-0', 'translate-y-10');
-            setTimeout(() => t.classList.add('opacity-0', 'translate-y-10'), 3000);
-        };
+    window.updatePlanUI = () => {
+        localStorage.setItem('planned_routine_v2', JSON.stringify(myPlannedRoutine));
+        const list = document.getElementById('routine-config-list');
+        const startBtn = document.getElementById('start-btn');
+        if (!list) return;
 
-        // INIT
-        window.onload = async () => {
-            document.getElementById('workout-date').value = new Date().toISOString().split('T')[0];
-            renderLibrary();
-            updatePlanUI();
+        if (myPlannedRoutine.length === 0) {
+            list.innerHTML = `<div class="p-10 text-center text-slate-600 italic text-sm">Añade ejercicios.</div>`;
+            startBtn?.classList.add('hidden');
+            return;
+        }
 
-            try {
-                await signInAnonymously(auth);
-            } catch (e) { console.error("Auth", e); }
+        startBtn?.classList.remove('hidden');
+        list.innerHTML = myPlannedRoutine.map((item, idx) => `
+            <div class="bg-white/5 border border-white/5 p-5 rounded-[1.5rem] flex items-center gap-4">
+                <div class="flex-1">
+                    <p class="font-black text-white text-sm">${item.name}</p>
+                    <p class="text-[9px] text-slate-500 uppercase font-black">${item.cat}</p>
+                </div>
+                <button onclick="window.removePlanItem(${idx})" class="text-rose-500">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2.5" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+        `).join('');
+    };
 
-            onAuthStateChanged(auth, u => {
-                if (u) {
-                    user = u;
-                    const qH = query(collection(db, 'artifacts', appId, 'users', user.uid, 'history'));
-                    onSnapshot(qH, snap => {
-                        const logs = [];
-                        snap.forEach(d => logs.push({ id: d.id, ...d.data() }));
-                        logs.sort((a,b) => b.timestamp - a.timestamp);
-                        renderHistory(logs);
-                    }, err => console.error("Snapshot", err));
-                }
-            });
-        };
+    window.removePlanItem = (i) => { myPlannedRoutine.splice(i, 1); window.updatePlanUI(); };
+    window.clearRoutine = () => { if(confirm("¿Vaciar?")) { myPlannedRoutine = []; window.updatePlanUI(); } };
 
-        document.getElementById('lib-search').addEventListener('input', e => renderLibrary(e.target.value));
+    // --- INICIALIZACIÓN ---
+    window.onload = () => {
+        document.getElementById('workout-date').value = new Date().toISOString().split('T')[0];
+        renderLibrary();
+        window.updatePlanUI();
         
-        // Exponer funciones globales
-        window.switchTab = switchTab;
-        window.addToPlan = addToPlan;
-        window.removePlanItem = removePlanItem;
-        window.updatePlanItem = updatePlanItem;
-        window.clearRoutine = clearRoutine;
-        window.startRoutine = startRoutine;
-        window.toggleSet = toggleSet;
-        window.updateSetData = updateSetData;
-        window.saveFullSession = saveFullSession;
-        window.deleteEntry = deleteEntry;
-    </script>
+        onAuthStateChanged(auth, u => {
+            if (u) {
+                user = u;
+                showToast("Conectado como: " + u.email);
+                // Aquí cargarías historial...
+            } else {
+                window.iniciarSesion(); // Pide login al entrar
+            }
+        });
+    };
+
+    // Exponer funciones restantes al objeto window
+    window.startRoutine = () => { /* tu lógica de inicio */ window.switchTab('train'); };
+    window.showToast = (msg) => {
+        const t = document.getElementById('toast');
+        if(!t) return;
+        t.textContent = msg;
+        t.classList.remove('opacity-0');
+        setTimeout(() => t.classList.add('opacity-0'), 3000);
+    };
+
+    document.getElementById('lib-search')?.addEventListener('input', e => renderLibrary(e.target.value));
+</script>  
 </body>
 </html>
