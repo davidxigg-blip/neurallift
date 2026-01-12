@@ -277,7 +277,7 @@
                     <p class="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-3 px-1">${cat}</p>
                     <div class="grid grid-cols-1 gap-2">
                         ${filtered.map(ex => `
-                            <button onclick="addToPlan('${ex}', '${cat}')" class="w-full text-left bg-white/5 px-5 py-4 rounded-2xl text-sm font-bold text-slate-300 hover:border-indigo-500 border border-transparent transition-all flex justify-between items-center group">
+                            <button onclick="window.addToPlan('${ex}', '${cat}')" class="w-full text-left bg-white/5 px-5 py-4 rounded-2xl text-sm font-bold text-slate-300 hover:border-indigo-500 border border-transparent transition-all flex justify-between items-center group">
                                 ${ex}
                                 <span class="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity font-black">+</span>
                             </button>
